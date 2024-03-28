@@ -47,7 +47,7 @@ scheduler.start({
 });
 ```
 
-ew! -And to top it off, while all fibers are sleeping, the scheduler busy-waits! That sucks!
+ew! -And to top it off, while all fibers are sleeping, the scheduler busy-waits! That sucks! (Rockhopper fixes this.)
 
 What if that looked more like this:
 ```d
@@ -73,7 +73,6 @@ Sleeping is the easy case. The scheduler provides a `wait` function to you.
 For I/O, you're on your own.
 
 Rockhopper gives you versions of many standard library functions, that yield your fiber instead of blocking the thread.
-It does this efficiently, using its own reactor.
 
 The provided I/O functions have identical signatures, they are not task-based in any way.
 
