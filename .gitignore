@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/rockhopper
+rockhopper.so
+rockhopper.dylib
+rockhopper.dll
+rockhopper.a
+rockhopper.lib
+rockhopper-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

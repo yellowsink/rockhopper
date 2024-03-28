@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Hazel Atkinson"
+	],
+	"copyright": "Copyright © 2024, Hazel Atkinson",
+	"description": "A small fiber-based async library for D",
+	"license": "BSD-3-Clause",
+	"name": "rockhopper"
+}
