@@ -1,6 +1,6 @@
 # Rockhopper
 
-A small async library for D, built on `core.thread.Fiber` and `std.concurrency.FiberScheduler`.
+A small async library for D, built on `core.thread.Fiber`.
 
 ## Why fibers?
 
@@ -47,7 +47,7 @@ scheduler.start({
 });
 ```
 
-ew! -And this isn't thread-safe, if you choose to throw threads into the mix.
+ew! -And to top it off, while all fibers are sleeping, the scheduler busy-waits! That sucks!
 
 What if that looked more like this:
 ```d
@@ -70,8 +70,10 @@ blockOn(); // with no argument, blockOn blocks on *the entire scheduler*
 ### I/O
 
 Sleeping is the easy case. The scheduler provides a `wait` function to you.
-For I/O, you're on your own. Rockhopper bridges the gap for you with versions of many standard library functions, that
-yield your fiber instead of blocking the thread.
+For I/O, you're on your own.
+
+Rockhopper gives you versions of many standard library functions, that yield your fiber instead of blocking the thread.
+It does this efficiently, using its own reactor.
 
 The provided I/O functions have identical signatures, they are not task-based in any way.
 

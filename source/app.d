@@ -20,13 +20,23 @@ void schedulerSleep(ulong d)
   cond.wait(dur!"msecs"(d));
 }
 
+void threadWaitSleep(ulong d)
+{
+  auto m = new Mutex;
+  auto cond = scheduler.newCondition(m);
+  new Thread({
+    Thread.sleep(dur!"msecs"(d));
+
+  }).start();
+}
+
 void main()
 {
   // set up the scheduler, in this case, one backed by fibers
   scheduler = new FiberScheduler;
 
   void queueTask(int x) {
-    scheduler.spawn({ writeln("hi from ", x); schedulerSleep(250); writeln("bye from ", x); });
+    scheduler.spawn({ writeln("hi from ", x); schedulerSleep(10_000); writeln("bye from ", x); });
   }
 
   // start a few tasks on the scheduler
