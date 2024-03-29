@@ -51,11 +51,11 @@ public Reactor reactor() @property // @suppress(dscanner.confusing.function_attr
     Nullable!TimerID blockerResult;
   }
 
-  // The currently executing fiber.
   Nullable!WrappedFiber _currentFiber;
-  public inout(Nullable!WrappedFiber) currentFiber() @property inout
+  // The currently executing fiber. Only valid to call inside of a running fiber.
+  public inout(WrappedFiber) currentFiber() @property inout
   {
-    return _currentFiber;
+    return _currentFiber.get;
   }
 
   WrappedFiber[] fibers;
