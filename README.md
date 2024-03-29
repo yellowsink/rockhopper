@@ -1,6 +1,6 @@
 # Rockhopper
 
-A small async library for D, built on `core.thread.Fiber`.
+A small async library for D, built on `core.thread.Fiber` and `eventcore`.
 
 ## Why fibers?
 
@@ -51,20 +51,20 @@ ew! -And to top it off, while all fibers are sleeping, the scheduler busy-waits!
 
 What if that looked more like this:
 ```d
-import rockhopper : spawn, blockOn, sleep;
+import rockhopper : spawn, entrypoint, sleep;
 
-spawn({
-  writeln("hi 1!");
-  sleep(dur!"msecs"(250));
-  writeln("bye 1");
+entrypoint({
+  spawn({
+    writeln("hi 1!");
+    sleep(dur!"msecs"(250));
+    writeln("bye 1");
+  });
+  spawn({
+    writeln("hi 2!");
+    sleep(dur!"msecs"(250));
+    writeln("bye 2");
+  });
 });
-spawn({
-  writeln("hi 2!");
-  sleep(dur!"msecs"(250));
-  writeln("bye 2");
-});
-
-blockOn(); // with no argument, blockOn blocks on *the entire scheduler*
 ```
 
 ### I/O
@@ -73,29 +73,26 @@ Sleeping is the easy case. The scheduler provides a `wait` function to you.
 For I/O, you're on your own.
 
 Rockhopper gives you versions of many standard library functions, that yield your fiber instead of blocking the thread.
+The eventcore library is used to make these fully efficient - while blocking on I/O the app will not use extraneous CPU,
+and will not add latency.
 
 The provided I/O functions have identical signatures, they are not task-based in any way.
 
 ## Indefinite execution
 
-Rockhopper's `wait()` function returns as soon as the thread count drops to zero,
-so if you want a long running program, it is recommended to fire off a "main" fiber:
+It is recommended to fire off a "main" fiber:
 ```d
-main() {
-  import rockhopper : blockOn;
-  // with an argument, blockOn blocks on a newly created fiber
-  blockOn(&mainAsync);
-  // by this point, both mainAsync, and all spawn()ed tasks inside it have ended.
-}
+import rockhopper : entrypoint, spawn;
+
+main() { entrypoint(&mainAsync); }
 
 mainAsync() {
-  import rockhopper : spawn;
   import rockhopper.io : File;
 
   auto stdin = File(std.stdio.stdin); // convert phobos File into rockhopper File
   foreach (line; stdin.byLine) { // byLine blocks the fiber now!
-    // this task may outlive mainAsync(), and can run things on the thread while the main one is waiting for a line
-    spawn({ doLongAsyncTask(line); });
+    // this fiber may outlive mainAsync(), and can run things on the thread while the main one is waiting for a line
+    spawn({ doLongAsyncWork(line); });
   }
 }
 ```
@@ -113,4 +110,4 @@ waitFor(fiber); // effectively just waits 500ms
 - [ ] Basic fiber management
 - [ ] `sleep`
 - [ ] `waitFor`
-- [ ] wrappers around common stdlib things
+- [ ] wrappers around other common stdlib things

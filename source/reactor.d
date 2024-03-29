@@ -1,5 +1,3 @@
-import std.concurrency : scheduler, FiberScheduler;
-
 private
 {
   bool isSetup = false;
