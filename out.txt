@@ -1,0 +1,20 @@
+    Starting Performing "debug" build using /usr/bin/dmd for x86_64.
+  Up-to-date taggedalgebraic 0.11.22: target for configuration [library] is up to date.
+  Up-to-date eventcore 0.9.29: target for configuration [epoll] is up to date.
+    Building rockhopper ~main: building configuration [application]
+     Linking rockhopper
+    Finished To force a rebuild of up-to-date targets, run again with --force
+     Running rockhopper 
+i'm number 1! hi!
+i'm number 2! hi!
+fibers before cull: 2
+fibers after cull: 2
+processEvents returned idle waitercount = 1
+number 1 slept for 2.5s
+fibers before cull: 2
+fibers after cull: 1
+processEvents returned outOfWaiters waitercount = 0
+number 2 slept for 4s
+fibers before cull: 1
+fibers after cull: 0
+processEvents returned outOfWaiters waitercount = 0

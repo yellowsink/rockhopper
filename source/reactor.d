@@ -11,46 +11,46 @@ public Reactor reactor() @property // @suppress(dscanner.confusing.function_attr
   return _reactorBacking.get;
 }
 
+import std.typecons : Tuple, tuple;
+import core.thread.fiber : Fiber;
+import taggedalgebraic : TaggedUnion;
+import eventcore.core : eventDriver;
+import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason;
+import std.datetime : Duration;
+
+private union _FiberBlockerRaw
+{
+  // TODO: support not-timers
+  //string nsLookup;
+  //EventID ecThreadEvent;
+  //Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
+  //Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
+  //Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
+  //Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
+  //ProcessID procWait;
+  //int signalTrap;
+  // TODO: sockets
+  TimerID sleep;
+  // TODO: directory watchers
+}
+
+alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
+
+class WrappedFiber
+{
+  // the actual fiber
+  Fiber fiber;
+  // when unset, fiber is unblocked, when set, the blocker the fiber is waiting on
+  Nullable!FiberBlocker currentBlocker;
+  // if the current blocker has had its callback registered or not
+  bool blockerRegistered;
+  // when set, the result of the blocker (file data, etc) to be passed back to the fiber
+  // TODO: support more than timers
+  Nullable!TimerID blockerResult;
+}
 
 /*private*/ class Reactor
 {
-  import std.typecons : Tuple, tuple;
-  import core.thread.fiber : Fiber;
-  import taggedalgebraic : TaggedUnion;
-  import eventcore.core : eventDriver;
-  import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason;
-  import std.datetime : Duration;
-
-  union _FiberBlockerRaw
-  {
-    // TODO: support not-timers
-    //string nsLookup;
-    //EventID ecThreadEvent;
-    //Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
-    //Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
-    //Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
-    //Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
-    //ProcessID procWait;
-    //int signalTrap;
-    // TODO: sockets
-    TimerID sleep;
-    // TODO: directory watchers
-  }
-  alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
-
-  class WrappedFiber
-  {
-    // the actual fiber
-    Fiber fiber;
-    // when unset, fiber is unblocked, when set, the blocker the fiber is waiting on
-    Nullable!FiberBlocker currentBlocker;
-    // if the current blocker has had its callback registered or not
-    bool blockerRegistered;
-    // when set, the result of the blocker (file data, etc) to be passed back to the fiber
-    // TODO: support more than timers
-    Nullable!TimerID blockerResult;
-  }
-
   Nullable!WrappedFiber _currentFiber;
   // The currently executing fiber. Only valid to call inside of a running fiber.
   public inout(WrappedFiber) currentFiber() @property inout
@@ -91,38 +91,55 @@ public Reactor reactor() @property // @suppress(dscanner.confusing.function_attr
         _currentFiber.nullify();
       }
 
+import std.stdio;
+
+      writeln("fibers before cull: ", fibers.length);
+
+      // step 1.5: remove finished fibers
+      fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
+
+      writeln("fibers after cull: ", fibers.length);
+
       // step 2: get fibers with blockers
       auto fibersToRegister = fibers.filter!(f => !f.currentBlocker.isNull && !f.blockerRegistered).array;
 
       // step 3: register callbacks
-      foreach (f; fibersToRegister)
+      foreach (f_; fibersToRegister)
       {
-        f.blockerRegistered = true;
-        // TODO: support blockers other than `sleep`
-        auto tid = f.currentBlocker.get.sleepValue;
 
-        eventDriver.timers.wait(tid, (TimerID _timerId) nothrow {
-          assert(tid == _timerId);
 
-          // resolve blocker!
-          f.currentBlocker.nullify();
-          f.blockerRegistered = false;
-          f.blockerResult = tid;
-        });
+        void scopehack(WrappedFiber f) {
+          f.blockerRegistered = true;
+          // TODO: support blockers other than `sleep`
+          auto tid = f.currentBlocker.get.sleepValue;
+
+          eventDriver.timers.wait(tid, (TimerID _timerId) nothrow{
+            //debug { import std.stdio : writeln; try { writeln(tid); } catch (Exception) {} }
+            //debug { import std.stdio : writeln; try { writeln(_timerId); } catch (Exception) {} }
+            assert(tid == _timerId);
+
+            // resolve blocker!
+            f.currentBlocker.nullify();
+            f.blockerRegistered = false;
+            f.blockerResult = tid;
+          });
+        }
+
+        scopehack(f_);
       }
 
       // step 4: run event loop!
       // when processEvents is called with no params, will wait unless none are queued
       // instead, we want to just wait indefinitely if there are no queued events, so pass Duration.max
-      auto eventFinishReason = eventDriver.core.processEvents(Duration.max);
-      if (eventFinishReason == ExitReason.exited)
-      {
-        // TODO: does handling a user-requested exit need more finesse?
-        break;
-      }
-      // TODO: what is ExitReason.idle?
-      // ExitReason.outOfWaiters -> impossible due to Duration.max (or waits a super long time)
-      // ExitReason.timeout -> impossible, or, the system has been runnning for Duration.max time and is about to explode
+      auto exited = false;
+      //while (!exited && eventDriver.core.waiterCount)
+      //{
+        auto er = eventDriver.core.processEvents(Duration.max);
+        exited = ExitReason.exited == er;
+        writeln("processEvents returned ", er, " waitercount = ", eventDriver.core.waiterCount);
+        // TODO: what is ExitReason.idle?
+      //}
+      if (exited) break;
     }
   }
 }
