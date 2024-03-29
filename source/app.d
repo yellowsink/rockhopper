@@ -44,23 +44,24 @@ void main()
       schedulerSleep(100);
     }
   }); */
-  scheduler.start({
+  /* scheduler.start({
     writeln("hi");
     threadWaitSleep(500);
     writeln("wow!");
     schedulerSleep(500);
     writeln("sched.");
-  });
+  }); */
 
-  /* void queueTask(int x) {
-    scheduler.spawn({ writeln("hi from ", x); schedulerSleep(10_000); writeln("bye from ", x); });
+scheduler.start({
+  void queueTask(int x) {
+    scheduler.spawn({ writeln("hi from ", x); schedulerSleep(1_000); writeln("bye from ", x); });
   }
 
   // start a few tasks on the scheduler
   for (auto i = 0; i < 5; i++)
     queueTask(i);
-
-  scheduler.start({}); */
+});
+//  scheduler.start({});
 
 /* scheduler = new FiberScheduler;
 
