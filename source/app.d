@@ -2,7 +2,7 @@ import std.stdio;
 import std.datetime : dur;
 
 import reactor : spawn, entrypoint, earlyExit;
-import events : sleep;
+import events : sleep, fileRead;
 
 void main()
 {
@@ -11,6 +11,18 @@ void main()
 }
 
 void mainAsync()
+{
+  import std.string : assumeUTF, stripRight;
+
+  writeln("reading");
+  auto buf = new ubyte[100];
+  auto res = fileRead("dub.json", 0, buf);
+  writeln("status: ", res[0]);
+  writeln("read amt: ", res[1]);
+  writeln("buffer: ", stripRight(buf.assumeUTF, "\0"));
+}
+
+/* void mainAsync()
 {
   spawn({
     writeln("i'm number 1! hi!");
@@ -29,4 +41,4 @@ void mainAsync()
   sleep(dur!"msecs"(500));
 
   writeln("end of mainAsync()");
-}
+} */

@@ -20,7 +20,7 @@ public {
 
   // return type must be the same as blockerResult
   // The function called to await on a blocker. You MUST use this function to do so.
-  TimerID awaitBlocker(FiberBlocker bl)
+  BlockerReturn awaitBlocker(FiberBlocker bl)
   {
     assert(!reactor._currentFiber.isNull);
     auto cf = reactor._currentFiber.get;
@@ -30,7 +30,12 @@ public {
     cf.blockerResult.nullify();
 
     while (cf.blockerResult.isNull) yield();
-    return cf.blockerResult.get;
+
+    auto res = cf.blockerResult.get;
+    cf.currentBlocker.nullify();
+    cf.blockerRegistered = false;
+
+    return res;
   }
 
   // bails out of the event loop *now*
@@ -47,14 +52,14 @@ public {
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion;
-import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason;
+import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason, IOStatus;
 
 private union _FiberBlockerRaw
 {
-  // TODO: support not-timers
+  // TODO: implement more of these
   //string nsLookup;
   //EventID ecThreadEvent;
-  //Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
+  Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
   //Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
   //Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
   //Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
@@ -66,6 +71,14 @@ private union _FiberBlockerRaw
 }
 
 public alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
+
+private union _BlockerReturnRaw
+{
+  Tuple!(IOStatus, ulong) fileRead;
+  Object sleep; // basically empty but pretty sure `void` will cause... issues.
+}
+
+public alias BlockerReturn = TaggedUnion!_BlockerReturnRaw;
 
 // === LAZY INIT ===
 
@@ -132,18 +145,32 @@ private class Reactor
         (f) {
           f.blockerRegistered = true;
           // TODO: support blockers other than `sleep`
-          auto tid = f.currentBlocker.get.sleepValue;
+          auto blocker = f.currentBlocker.get;
 
-          eventDriver.timers.wait(tid, (TimerID _timerId) nothrow{
-            //debug { import std.stdio : writeln; try { writeln(tid); } catch (Exception) {} }
-            //debug { import std.stdio : writeln; try { writeln(_timerId); } catch (Exception) {} }
-            assert(tid == _timerId);
+          final switch (blocker.kind)
+          {
+            case FiberBlocker.Kind.sleep:
+              auto timid = blocker.sleepValue;
+              eventDriver.timers.wait(timid, (TimerID _timerId) nothrow{
+                assert(timid == _timerId);
 
-            // resolve blocker!
-            f.currentBlocker.nullify();
-            f.blockerRegistered = false;
-            f.blockerResult = tid;
-          });
+                f.blockerResult = BlockerReturn.sleep(new Object);
+              });
+            break;
+
+            case FiberBlocker.Kind.fileRead:
+              auto fd = blocker.fileReadValue[0];
+              auto oset = blocker.fileReadValue[1];
+              auto buf = blocker.fileReadValue[2];
+              auto mode = blocker.fileReadValue[3];
+
+              eventDriver.files.read(fd, oset, buf, mode, (FileFD _fd, IOStatus status, ulong read) nothrow{
+                assert(fd == _fd);
+
+                f.blockerResult = BlockerReturn.fileRead(tuple(status, read));
+              });
+            break;
+          }
         }(f_);
       }
 
@@ -162,14 +189,12 @@ private class Reactor
       fiber = new Fiber(fn);
     }
 
-    // the actual fiber
     Fiber fiber;
     // when unset, fiber is unblocked, when set, the blocker the fiber is waiting on
     Nullable!FiberBlocker currentBlocker;
     // if the current blocker has had its callback registered or not
     bool blockerRegistered;
     // when set, the result of the blocker (file data, etc) to be passed back to the fiber
-    // TODO: support more than timers
-    Nullable!TimerID blockerResult;
+    Nullable!BlockerReturn blockerResult;
   }
 }
