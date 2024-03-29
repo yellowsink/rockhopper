@@ -24,9 +24,8 @@ void mainAsync()
     writeln("number 2 slept for 2.5s");
   });
 
-  //writeln("mainAsync() about to sleep for 10s...");
-  //sleep(dur!"msecs"(10_000));
-  // this DOESNT work
+  writeln("mainAsync() about to sleep for 500ms...");
+  sleep(dur!"msecs"(500));
 
   writeln("end of mainAsync()");
 }

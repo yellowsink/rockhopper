@@ -96,13 +96,19 @@ private class Reactor
 
     while (fibers.length)
     {
-      // step 1: run all fibers (clone arr first to disambiguate mutation behaviour)
+      auto fiberCountBefore = fibers.length;
+      // step 1: run all fibers (clone array to not loop over new fibers!)
       foreach(f; fibers.array)
       {
         _currentFiber = f;
         f.fiber.call();
         _currentFiber.nullify();
       }
+
+      // step 1.5: handle new fibers!
+      // if we have new fibers, don't stop and wait for the current fibers to finish blocking, there's more stuff to do!
+      // instead, just loop back round to the start and keep going
+      if (fibers.length > fiberCountBefore) continue;
 
       // step 2: remove finished fibers
       fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
