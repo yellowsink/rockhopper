@@ -32,6 +32,15 @@ public {
     while (cf.blockerResult.isNull) yield();
     return cf.blockerResult.get;
   }
+
+  // bails out of the event loop *now*
+  void earlyExit()
+  {
+    import eventcore.core : eventDriver;
+
+    eventDriver.core.exit();
+    yield();
+  }
 }
 
 // === FIBER BLOCKER TYPE ===

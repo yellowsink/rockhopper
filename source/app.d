@@ -1,7 +1,7 @@
 import std.stdio;
 import std.datetime : dur;
 
-import reactor : spawn, entrypoint;
+import reactor : spawn, entrypoint, earlyExit;
 import events : sleep;
 
 void main()
@@ -20,6 +20,7 @@ void mainAsync()
 
   spawn({
     writeln("i'm number 2! hi!");
+    //earlyExit();
     sleep(dur!"msecs"(2500));
     writeln("number 2 slept for 2.5s");
   });
