@@ -4,55 +4,50 @@ import std.datetime : dur;
 import reactor : spawn, entrypoint, earlyExit, yield;
 import events : sleep, fileRead, fileOpen, FileOpenMode;
 
-void main()
-{
-  entrypoint(&mainAsync);
-  writeln("end of main()");
-}
+import core.sys.posix.unistd : isatty, STDIN_FILENO;
+import core.sys.posix.termios : tcsetattr, tcgetattr, termios, TCSANOW;
+
+extern (C) void cfmakeraw(termios*);
+
+void main() { entrypoint(&mainAsync); }
 
 void mainAsync()
 {
-  import std.string : assumeUTF, stripRight;
-
-  bool stopFiberTwo = false;
-
+  // background fiber
   spawn({
-    while (!stopFiberTwo) {
-      writeln("fiber 2 says hi!");
-      yield();
+    while (true) {
+      writeln("\033[Gboop.");
+      sleep(dur!"msecs"(1000));
     }
   });
 
-  writeln("opening");
-  auto openRes = fileOpen("dub.json", FileOpenMode.read);
-  writeln("opened file desc: ", openRes[0], " status: ", openRes[1]);
+  import std.string : assumeUTF, stripRight;
 
-  writeln("reading");
-  auto buf = new ubyte[100];
-  auto readRes = fileRead(openRes[0], 0, buf);
-  writeln("status: ", readRes[0], " read amt: ", readRes[1]);
-  writeln("buffer: ", buf.assumeUTF);
+  // raw mode
+  assert(isatty(STDIN_FILENO));
+  termios optsBackup;
+  termios optsRaw;
 
-  stopFiberTwo = true;
+  tcgetattr(STDIN_FILENO, &optsBackup);
+  cfmakeraw(&optsRaw);
+  tcsetattr(STDIN_FILENO, TCSANOW, &optsRaw);
+
+  //auto openRes = fileOpen("/dev/stdin", FileOpenMode.read);
+  //writeln("opened stdin: ", openRes[1]);
+  import eventcore.core : eventDriver;
+  auto stdin = eventDriver.files.adopt(STDIN_FILENO);
+
+  while (true) {
+    auto buf = new ubyte[1];
+    auto readRes = fileRead(stdin, 0, buf);
+    auto bufStr = buf.assumeUTF;
+    if (bufStr[0] == 'd') {
+      writeln("\033[GI got a 'd', I'm outta here!");
+      // raw mode off
+      tcsetattr(STDIN_FILENO, TCSANOW, &optsBackup);
+      earlyExit();
+    }
+
+    writeln("\033[Ggot a char!", bufStr, " ", readRes[1]);
+  }
 }
-
-/* void mainAsync()
-{
-  spawn({
-    writeln("i'm number 1! hi!");
-    sleep(dur!"msecs"(4000));
-    writeln("number 1 slept for 4s");
-  });
-
-  spawn({
-    writeln("i'm number 2! hi!");
-    //earlyExit();
-    sleep(dur!"msecs"(2500));
-    writeln("number 2 slept for 2.5s");
-  });
-
-  writeln("mainAsync() about to sleep for 500ms...");
-  sleep(dur!"msecs"(500));
-
-  writeln("end of mainAsync()");
-} */
