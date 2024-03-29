@@ -104,10 +104,3 @@ You can wait for a fiber to complete with `waitFor`, thread-`join`-style.
 auto fiber = hop({ sleep(dur!"msecs"(500)); });
 waitFor(fiber); // effectively just waits 500ms
 ```
-
-## Roadmap
-
-- [ ] Basic fiber management
-- [ ] `sleep`
-- [ ] `waitFor`
-- [ ] wrappers around other common stdlib things
