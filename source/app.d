@@ -1,8 +1,8 @@
 import std.stdio;
 import std.datetime : dur;
 
-import reactor : spawn, entrypoint, earlyExit;
-import events : sleep, fileRead;
+import reactor : spawn, entrypoint, earlyExit, yield;
+import events : sleep, fileRead, fileOpen, FileOpenMode;
 
 void main()
 {
@@ -14,12 +14,26 @@ void mainAsync()
 {
   import std.string : assumeUTF, stripRight;
 
+  bool stopFiberTwo = false;
+
+  spawn({
+    while (!stopFiberTwo) {
+      writeln("fiber 2 says hi!");
+      yield();
+    }
+  });
+
+  writeln("opening");
+  auto openRes = fileOpen("dub.json", FileOpenMode.read);
+  writeln("opened file desc: ", openRes[0], " status: ", openRes[1]);
+
   writeln("reading");
   auto buf = new ubyte[100];
-  auto res = fileRead("dub.json", 0, buf);
-  writeln("status: ", res[0]);
-  writeln("read amt: ", res[1]);
-  writeln("buffer: ", stripRight(buf.assumeUTF, "\0"));
+  auto readRes = fileRead(openRes[0], 0, buf);
+  writeln("status: ", readRes[0], " read amt: ", readRes[1]);
+  writeln("buffer: ", buf.assumeUTF);
+
+  stopFiberTwo = true;
 }
 
 /* void mainAsync()

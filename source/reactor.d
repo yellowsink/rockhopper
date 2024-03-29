@@ -1,3 +1,5 @@
+module reactor;
+
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
 
@@ -52,13 +54,15 @@ public {
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion;
-import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason, IOStatus;
+import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason, IOStatus, FileOpenMode,
+                          OpenStatus;
 
 private union _FiberBlockerRaw
 {
   // TODO: implement more of these
   //string nsLookup;
   //EventID ecThreadEvent;
+  Tuple!(string, FileOpenMode) fileOpen;
   Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
   //Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
   //Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
@@ -74,6 +78,7 @@ public alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
 
 private union _BlockerReturnRaw
 {
+  Tuple!(FileFD, OpenStatus) fileOpen;
   Tuple!(IOStatus, ulong) fileRead;
   Object sleep; // basically empty but pretty sure `void` will cause... issues.
 }
@@ -168,6 +173,15 @@ private class Reactor
                 assert(fd == _fd);
 
                 f.blockerResult = BlockerReturn.fileRead(tuple(status, read));
+              });
+            break;
+
+            case FiberBlocker.Kind.fileOpen:
+              auto path = blocker.fileOpenValue[0];
+              auto mode = blocker.fileOpenValue[1];
+
+              eventDriver.files.open(path, mode, (FileFD fd, OpenStatus status) nothrow{
+                f.blockerResult = BlockerReturn.fileOpen(tuple(fd, status));
               });
             break;
           }

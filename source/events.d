@@ -16,12 +16,16 @@ void sleep(Duration d)
 }
 
 import std.stdio : File;
-import eventcore.driver : IOMode, IOStatus, FileOpenMode;
+import eventcore.driver : IOMode, FileFD;
+public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
 
-Tuple!(IOStatus, ulong) fileRead(string path, ulong oset, ubyte[] buffer/* , IOMode mode */)
+Tuple!(FileFD, OpenStatus) fileOpen(string path, FileOpenMode mode)
 {
-  // TODO: use async open, or use dlang File type somehow
-  auto fd = eventDriver.files.open(path, FileOpenMode.read);
+  return awaitBlocker(FiberBlocker.fileOpen(tuple(path, mode))).fileOpenValue;
+}
+
+Tuple!(IOStatus, ulong) fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
+{
   alias mode = IOMode.once;
 
   return awaitBlocker(FiberBlocker.fileRead(tuple(fd, oset, buffer, mode))).fileReadValue;
