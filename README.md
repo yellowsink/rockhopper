@@ -78,9 +78,8 @@ and will not add latency.
 
 The provided I/O functions have identical signatures, they are not task-based in any way.
 
-## Indefinite execution
+## Example
 
-It is recommended to fire off a "main" fiber:
 ```d
 import rockhopper : entrypoint, spawn;
 
@@ -95,12 +94,4 @@ mainAsync() {
     spawn({ doLongAsyncWork(line); });
   }
 }
-```
-
-## "Joining" a fiber
-You can wait for a fiber to complete with `waitFor`, thread-`join`-style.
-
-```d
-auto fiber = hop({ sleep(dur!"msecs"(500)); });
-waitFor(fiber); // effectively just waits 500ms
 ```
