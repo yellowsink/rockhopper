@@ -130,7 +130,7 @@ private class Reactor
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
-		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW, BlockerReturnSignalTrap;
+		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW, BlockerReturnSignalTrap, BlockerReturnNsLookup;
 
 		// don't register a callback if there is nothing to register, or it's already done.
 		if (f.currentBlocker.isNull || f.blockerRegistered)
@@ -141,15 +141,15 @@ private class Reactor
 
 		final switch (genericBlocker.kind)
 		{
-		case FiberBlocker.Kind.sleep:
-			auto timerId = genericBlocker.sleepValue;
+		/* case FiberBlocker.Kind.nsLookup:
+			auto name = genericBlocker.nsLookupValue;
 
-			eventDriver.timers.wait(timerId, (_timerId) nothrow{
-				assert(timerId == _timerId);
+			eventDriver.dns.lookupHost(name, (_id, status, addresses) {
 
-				f.blockerResult = BlockerReturn.sleep(new Object);
+
+				f.blockerResult = BlockerReturn.nsLookup(BlockerReturnNsLookup(status, addresses));
 			});
-			break;
+			break; */
 
 		case FiberBlocker.Kind.fileOpen:
 			auto b = genericBlocker.fileOpenValue;
@@ -196,6 +196,16 @@ private class Reactor
 				assert(_sigNum == sig);
 
 				f.blockerResult = BlockerReturn.signalTrap(BlockerReturnSignalTrap(slID, status));
+			});
+			break;
+
+		case FiberBlocker.Kind.sleep:
+			auto timerId = genericBlocker.sleepValue;
+
+			eventDriver.timers.wait(timerId, (_timerId) nothrow{
+				assert(timerId == _timerId);
+
+				f.blockerResult = BlockerReturn.sleep(new Object);
 			});
 			break;
 		}

@@ -12,7 +12,4 @@ void mainAsync()
 {
 	import events;
 
-	auto opened = fileOpen("dub.json", FileOpenMode.read);
-
-	fileClose(opened.fd);
 }

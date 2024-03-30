@@ -2,9 +2,28 @@ module blockers;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion;
-import eventcore.driver : /* EventID, */ FileFD, /* PipeFD, */ IOMode;
+import eventcore.driver : FileFD, PipeFD, IOMode;
 
 // === BLOCKER SENDS ===
+
+private
+{
+	struct BlockerRead(FD)
+	{
+		FD fd;
+		ulong offset;
+		ubyte[] buf;
+		IOMode ioMode;
+	}
+
+	struct BlockerWrite(FD)
+	{
+		FD fd;
+		ulong offset;
+		const(ubyte)[] buf;
+		IOMode ioMode;
+	}
+}
 
 public
 {
@@ -16,30 +35,25 @@ public
 		FileOpenMode mode;
 	}
 
-	struct BlockerFileRead
-	{
-		FileFD fd;
-		ulong offset;
-		ubyte[] buf;
-		IOMode ioMode;
-	}
-
-	struct BlockerFileWrite
-	{
-		FileFD fd;
-		ulong offset;
-		const(ubyte)[] buf;
-		IOMode ioMode;
-	}
+	alias BlockerFileRead = BlockerRead!FileFD;
+	//alias BlockerPipeRead = BlockerRead!PipeFD;
+	alias BlockerFileWrite = BlockerWrite!FileFD;
+	//alias BlockerPipeWrite = BlockerWrite!PipeFD;
 }
+
+// TODO: test the following
+// - pipe read
+// - pipe write
+// - spawn
+// - wait
 
 private union _FiberBlockerRaw
 {
 	import eventcore.driver : TimerID/* , ProcessID */;
 
-	// TODO: implement more of these
+	// TODO: currently, nsLookup is disabled due to all returned addresses being null
 	//string nsLookup;
-	//EventID ecThreadEvent;
+	// TODO: eventcore thread events
 	BlockerFileOpen fileOpen;
 	FileFD fileClose;
 	BlockerFileRead fileRead;
@@ -59,6 +73,14 @@ public alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
 
 public
 {
+	/* struct BlockerReturnNsLookup
+	{
+		import eventcore.driver : DNSStatus, RefAddress;
+
+		DNSStatus status;
+		RefAddress[] addresses;
+	} */
+
 	struct BlockerReturnFileOpen
 	{
 		import eventcore.driver : OpenStatus;
@@ -89,6 +111,7 @@ private union _BlockerReturnRaw
 {
 	import eventcore.driver : CloseStatus;
 
+	//BlockerReturnNsLookup nsLookup;
 	BlockerReturnFileOpen fileOpen;
 	CloseStatus fileClose;
 	BlockerReturnFileRW fileRW;

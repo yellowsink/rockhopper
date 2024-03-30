@@ -6,8 +6,8 @@ import blockers;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 
-// sleep imports
-import std.datetime : Duration, dur;
+// dns related imports
+//public import eventcore.driver : DNSStatus, RefAddress;
 
 // file related imports
 import eventcore.driver : IOMode, FileFD;
@@ -16,15 +16,13 @@ public import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus
 // signal related imports
 public import eventcore.driver : SignalStatus;
 
-void sleep(Duration d)
+// sleep imports
+import std.datetime : Duration, dur;
+
+/* BlockerReturnNsLookup nsLookup(string name)
 {
-
-  // 0ms repeat = don't repeat
-  auto timer = eventDriver.timers.create();
-  eventDriver.timers.set(timer, d, dur!"msecs"(0));
-
-  awaitBlocker(FiberBlocker.sleep(timer));
-}
+	return awaitBlocker(FiberBlocker.nsLookup(name)).nsLookupValue;
+} */
 
 BlockerReturnFileOpen fileOpen(string path, FileOpenMode mode)
 {
@@ -55,4 +53,14 @@ SignalStatus signalTrap(int sig)
 	auto result = awaitBlocker(FiberBlocker.signalTrap(sig)).signalTrapValue;
 	eventDriver.signals.releaseRef(result.slID);
 	return result.status;
+}
+
+void sleep(Duration d)
+{
+
+	// 0ms repeat = don't repeat
+	auto timer = eventDriver.timers.create();
+	eventDriver.timers.set(timer, d, dur!"msecs"(0));
+
+	awaitBlocker(FiberBlocker.sleep(timer));
 }
