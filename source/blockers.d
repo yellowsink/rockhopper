@@ -21,6 +21,14 @@ public
 		ubyte[] buf;
 		IOMode ioMode;
 	}
+
+	struct BlockerFileWrite
+	{
+		FileFD fd;
+		ulong offset;
+		const(ubyte)[] buf;
+		IOMode ioMode;
+	}
 }
 
 private union _FiberBlockerRaw
@@ -30,7 +38,7 @@ private union _FiberBlockerRaw
 	//EventID ecThreadEvent;
 	BlockerFileOpen fileOpen;
 	BlockerFileRead fileRead;
-	//Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
+	BlockerFileWrite fileWrite;
 	//Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
 	//Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
 	//ProcessID procWait;
@@ -52,18 +60,18 @@ public
 		OpenStatus status;
 	}
 
-	struct BlockerReturnFileRead
+	struct BlockerReturnFileRW
 	{
 		IOStatus status;
 		// 0 if error
-		ulong bytesRead;
+		ulong bytesRWd;
 	}
 }
 
 private union _BlockerReturnRaw
 {
 	BlockerReturnFileOpen fileOpen;
-	BlockerReturnFileRead fileRead;
+	BlockerReturnFileRW fileRW;
 	Object sleep; // basically empty but pretty sure `void` will cause... issues.
 }
 

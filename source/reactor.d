@@ -120,16 +120,16 @@ private class Reactor
 				(f) {
 					import std.typecons : tuple;
 					import eventcore.driver : FileFD, TimerID, IOStatus, OpenStatus;
-					import blockers : BlockerReturnFileOpen, BlockerReturnFileRead;
+					import blockers : BlockerReturnFileOpen, BlockerReturnFileRW;
 
 					f.blockerRegistered = true;
-					// TODO: support blockers other than `sleep`
-					auto blocker = f.currentBlocker.get;
+					auto genericBlocker = f.currentBlocker.get;
 
-					final switch (blocker.kind)
+					final switch (genericBlocker.kind)
 					{
 						case FiberBlocker.Kind.sleep:
-							auto timid = blocker.sleepValue;
+							auto timid = genericBlocker.sleepValue;
+
 							eventDriver.timers.wait(timid, (TimerID _timerId) nothrow{
 								assert(timid == _timerId);
 
@@ -137,21 +137,31 @@ private class Reactor
 							});
 							break;
 
-						case FiberBlocker.Kind.fileRead:
-							auto bfr = blocker.fileReadValue;
+						case FiberBlocker.Kind.fileOpen:
+							auto b = genericBlocker.fileOpenValue;
 
-							eventDriver.files.read(bfr.fd, bfr.offset, bfr.buf, bfr.ioMode, (FileFD _fd, IOStatus status, ulong read) nothrow{
-								assert(bfr.fd == _fd);
-
-								f.blockerResult = BlockerReturn.fileRead(BlockerReturnFileRead(status, read));
+							eventDriver.files.open(b.path, b.mode, (FileFD fd, OpenStatus status) nothrow{
+								f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
 							});
 							break;
 
-						case FiberBlocker.Kind.fileOpen:
-							auto bfo = blocker.fileOpenValue;
+						case FiberBlocker.Kind.fileRead:
+							auto b = genericBlocker.fileReadValue;
 
-							eventDriver.files.open(bfo.path, bfo.mode, (FileFD fd, OpenStatus status) nothrow{
-								f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
+							eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (FileFD _fd, IOStatus status, ulong read) nothrow{
+								assert(b.fd == _fd);
+
+								f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, read));
+							});
+							break;
+
+						case FiberBlocker.Kind.fileWrite:
+							auto b = genericBlocker.fileWriteValue;
+
+							eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (FileFD _fd, IOStatus status, ulong written) nothrow{
+								assert(b.fd == _fd);
+
+								f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, written));
 							});
 							break;
 					}
