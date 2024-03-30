@@ -1,11 +1,21 @@
 module events;
 
+// general imports
 import reactor : awaitBlocker;
 import blockers;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 
+// sleep imports
 import std.datetime : Duration, dur;
+
+// file related imports
+import eventcore.driver : IOMode, FileFD;
+public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
+
+// signal related imports
+public import eventcore.driver : SignalStatus;
+
 void sleep(Duration d)
 {
 
@@ -15,9 +25,6 @@ void sleep(Duration d)
 
   awaitBlocker(FiberBlocker.sleep(timer));
 }
-
-import eventcore.driver : IOMode, FileFD;
-public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
 
 BlockerReturnFileOpen fileOpen(string path, FileOpenMode mode)
 {
@@ -36,4 +43,11 @@ BlockerReturnFileRW fileWrite(FileFD fd, ulong oset, const(ubyte)[] buffer/* , I
 	alias mode = IOMode.once;
 
 	return awaitBlocker(FiberBlocker.fileWrite(BlockerFileWrite(fd, oset, buffer, mode))).fileRWValue;
+}
+
+SignalStatus signalTrap(int sig)
+{
+	auto result = awaitBlocker(FiberBlocker.signalTrap(sig)).signalTrapValue;
+	eventDriver.signals.releaseRef(result.slID);
+	return result.status;
 }

@@ -46,7 +46,7 @@ private union _FiberBlockerRaw
 	//Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
 	//Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
 	//ProcessID procWait;
-	//int signalTrap;
+	int signalTrap;
 	// TODO: sockets
 	TimerID sleep;
 	// TODO: directory watchers
@@ -74,12 +74,21 @@ public
 		// 0 if error
 		ulong bytesRWd;
 	}
+
+	struct BlockerReturnSignalTrap
+	{
+		import eventcore.driver : SignalListenID, SignalStatus;
+
+		SignalListenID slID;
+		SignalStatus status;
+	}
 }
 
 private union _BlockerReturnRaw
 {
 	BlockerReturnFileOpen fileOpen;
 	BlockerReturnFileRW fileRW;
+	BlockerReturnSignalTrap signalTrap;
 	Object sleep; // basically empty but pretty sure `void` will cause... issues.
 }
 

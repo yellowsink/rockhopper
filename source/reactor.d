@@ -130,7 +130,7 @@ private class Reactor
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
-		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW;
+		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW, BlockerReturnSignalTrap;
 
 		// don't register a callback if there is nothing to register, or it's already done.
 		if (f.currentBlocker.isNull || f.blockerRegistered)
@@ -176,6 +176,16 @@ private class Reactor
 				assert(b.fd == _fd);
 
 				f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, written));
+			});
+			break;
+
+		case FiberBlocker.Kind.signalTrap:
+			auto sig = genericBlocker.signalTrapValue;
+
+			eventDriver.signals.listen(sig, (slID, status, _sigNum) {
+				assert(_sigNum == sig);
+
+				f.blockerResult = BlockerReturn.signalTrap(BlockerReturnSignalTrap(slID, status));
 			});
 			break;
 		}
