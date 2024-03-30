@@ -87,98 +87,97 @@ private class Reactor
 	void loop()
 	{
 		import eventcore.core : eventDriver;
+		import eventcore.driver : ExitReason;
 		import std.array : array;
 		import std.algorithm : map, filter;
 		import std.datetime : Duration;
 
 		while (fibers.length)
 		{
-			auto fiberCountBefore = fibers.length;
 			// step 1: run all fibers (clone array to not loop over new fibers!)
-			foreach (f; fibers.array)
+			auto fibersBefore = fibers.array;
+			foreach (f; fibersBefore)
 			{
 				_currentFiber = f;
 				f.fiber.call();
-				_currentFiber.nullify();
 			}
+			_currentFiber.nullify();
 
-			// step 1.5: handle new fibers!
+			// step 2: check for new fibers!
 			// if we have new fibers, don't stop and wait for the current fibers to finish blocking, there's more stuff to do!
 			// instead, just loop back round to the start and keep going
-			auto newFibersAdded = fibers.length > fiberCountBefore;
+			auto newFibersAdded = fibers.length > fibersBefore.length;
 
-			// step 2: remove finished fibers
+			// step 3: remove finished fibers from the list
 			fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
 
-			// step 1.5 again: we have to remove finished fibers before we loop back around
+			// step 2.5: we have to remove finished fibers BEFORE we loop back around
 			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
 			if (newFibersAdded) continue;
 
-			// step 3: get fibers with blockers
-			auto fibersToRegister = fibers.filter!(f => !f.currentBlocker.isNull && !f.blockerRegistered).array;
-
-			// step 4: register callbacks
-			foreach (f_; fibersToRegister)
-			{
-				// https://forum.dlang.org/post/wpnlxtpmsyltjjwmmctp@forum.dlang.org
-				(f) {
-					import std.typecons : tuple;
-					import eventcore.driver : FileFD, TimerID, IOStatus, OpenStatus;
-					import blockers : BlockerReturnFileOpen, BlockerReturnFileRW;
-
-					f.blockerRegistered = true;
-					auto genericBlocker = f.currentBlocker.get;
-
-					final switch (genericBlocker.kind)
-					{
-						case FiberBlocker.Kind.sleep:
-							auto timid = genericBlocker.sleepValue;
-
-							eventDriver.timers.wait(timid, (TimerID _timerId) nothrow{
-								assert(timid == _timerId);
-
-								f.blockerResult = BlockerReturn.sleep(new Object);
-							});
-							break;
-
-						case FiberBlocker.Kind.fileOpen:
-							auto b = genericBlocker.fileOpenValue;
-
-							eventDriver.files.open(b.path, b.mode, (FileFD fd, OpenStatus status) nothrow{
-								f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
-							});
-							break;
-
-						case FiberBlocker.Kind.fileRead:
-							auto b = genericBlocker.fileReadValue;
-
-							eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (FileFD _fd, IOStatus status, ulong read) nothrow{
-								assert(b.fd == _fd);
-
-								f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, read));
-							});
-							break;
-
-						case FiberBlocker.Kind.fileWrite:
-							auto b = genericBlocker.fileWriteValue;
-
-							eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (FileFD _fd, IOStatus status, ulong written) nothrow{
-								assert(b.fd == _fd);
-
-								f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, written));
-							});
-							break;
-					}
-				}(f_);
-			}
-
-			import eventcore.driver : ExitReason;
+			// step 4: register callbacks on fibers that need it
+			foreach (f; fibers)
+				registerCallbackIfNeeded(f);
 
 			// step 5: run event loop!
 			// when processEvents is called with no params, will wait unless none are queued
 			// instead, we want to just wait indefinitely if there are no queued events, so pass Duration.max
 			// TODO: what is ExitReason.idle?
 			if (ExitReason.exited == eventDriver.core.processEvents(Duration.max)) break;
+		}
+	}
+
+	private void registerCallbackIfNeeded(WrappedFiber f)
+	{
+		import eventcore.core : eventDriver;
+		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW;
+
+		// don't register a callback if there is nothing to register, or it's already done.
+		if (f.currentBlocker.isNull || f.blockerRegistered)
+			return;
+
+		f.blockerRegistered = true;
+		auto genericBlocker = f.currentBlocker.get;
+
+		final switch (genericBlocker.kind)
+		{
+		case FiberBlocker.Kind.sleep:
+			auto timerId = genericBlocker.sleepValue;
+
+			eventDriver.timers.wait(timerId, (_timerId) nothrow{
+				assert(timerId == _timerId);
+
+				f.blockerResult = BlockerReturn.sleep(new Object);
+			});
+			break;
+
+		case FiberBlocker.Kind.fileOpen:
+			auto b = genericBlocker.fileOpenValue;
+
+			eventDriver.files.open(b.path, b.mode, (fd, status) nothrow{
+				f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
+			});
+			break;
+
+		case FiberBlocker.Kind.fileRead:
+			auto b = genericBlocker.fileReadValue;
+
+			eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, read) nothrow{
+				assert(b.fd == _fd);
+
+				f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, read));
+			});
+			break;
+
+		case FiberBlocker.Kind.fileWrite:
+			auto b = genericBlocker.fileWriteValue;
+
+			eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, written) nothrow{
+				assert(b.fd == _fd);
+
+				f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, written));
+			});
+			break;
 		}
 	}
 

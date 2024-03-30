@@ -2,7 +2,7 @@ module blockers;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion;
-import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason, IOStatus, FileOpenMode, OpenStatus;
+import eventcore.driver : /* EventID, */ FileFD, /* PipeFD, */ IOMode;
 
 // === BLOCKER SENDS ===
 
@@ -10,6 +10,8 @@ public
 {
 	struct BlockerFileOpen
 	{
+		import eventcore.driver : FileOpenMode;
+
 		string path;
 		FileOpenMode mode;
 	}
@@ -33,6 +35,8 @@ public
 
 private union _FiberBlockerRaw
 {
+	import eventcore.driver : TimerID/* , ProcessID */;
+
 	// TODO: implement more of these
 	//string nsLookup;
 	//EventID ecThreadEvent;
@@ -56,12 +60,16 @@ public
 {
 	struct BlockerReturnFileOpen
 	{
+		import eventcore.driver : OpenStatus;
+
 		FileFD fd;
 		OpenStatus status;
 	}
 
 	struct BlockerReturnFileRW
 	{
+		import eventcore.driver : IOStatus;
+
 		IOStatus status;
 		// 0 if error
 		ulong bytesRWd;

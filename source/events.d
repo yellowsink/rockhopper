@@ -1,7 +1,7 @@
 module events;
 
 import reactor : awaitBlocker;
-import blockers : FiberBlocker, BlockerFileOpen, BlockerFileRead, BlockerFileWrite, BlockerReturnFileOpen, BlockerReturnFileRW;
+import blockers;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 
