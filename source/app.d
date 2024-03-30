@@ -1,13 +1,7 @@
 import std.stdio;
 import std.datetime : dur;
 
-import reactor : spawn, entrypoint, earlyExit, yield;
-import events : sleep, fileRead, fileOpen, FileOpenMode;
-
-import core.sys.posix.unistd : isatty, STDIN_FILENO;
-import core.sys.posix.termios : tcsetattr, tcgetattr, termios, TCSANOW;
-
-extern (C) void cfmakeraw(termios*);
+import reactor;
 
 void main()
 {
@@ -16,39 +10,43 @@ void main()
 
 void mainAsync()
 {
-	// background fiber
+	import events;
+	import std.string : assumeUTF;
+
+	// open two files in parallel, read some bytes from one, and write it into the other
+	// TODO: better cross-fiber synchronization tools (tasks abstraction?)
+
+	auto buf = new ubyte[5];
+	bool readFinished = false;
+
 	spawn({
-		while (true) {
-			writeln("\033[Gboop.");
-			sleep(dur!"msecs"(1000));
-		}
+		writeln("opening dub.json for read...");
+		auto dubJson = fileOpen("dub.json", FileOpenMode.read);
+
+		writeln("open ", dubJson.status, ", reading bytes 20-25 from dub.json...");
+		auto readRes = fileRead(dubJson.fd, 20, buf);
+		assert(readRes.bytesRWd == 5);
+		writeln("read result: \"", buf.assumeUTF, "\", status ", readRes.status);
+
+		readFinished = true;
 	});
 
-	import std.string : assumeUTF, stripRight;
+	spawn({
+		writeln("opening test.txt (createTrunc)...");
+		auto testTxt = fileOpen("test.txt", FileOpenMode.createTrunc);
 
-	// raw mode
-	assert(isatty(STDIN_FILENO));
-	termios optsBackup;
-	termios optsRaw;
+		writeln("opened test.txt ", testTxt.status);
 
-	tcgetattr(STDIN_FILENO, &optsBackup);
-	cfmakeraw(&optsRaw);
-	tcsetattr(STDIN_FILENO, TCSANOW, &optsRaw);
-
-	import eventcore.core : eventDriver;
-	auto stdin = eventDriver.files.adopt(STDIN_FILENO);
-
-	while (true) {
-		auto buf = new ubyte[1];
-		auto readRes = fileRead(stdin, 0, buf);
-		auto bufStr = buf.assumeUTF;
-		if (bufStr[0] == 'd') {
-			writeln("\033[GI got a 'd', I'm outta here!");
-			// raw mode off
-			tcsetattr(STDIN_FILENO, TCSANOW, &optsBackup);
-			earlyExit();
+		while (!readFinished)
+		{
+			// wait for read to finish, only the open really works in parallel.
+			writeln("waiting for read to finish before write can go ahead");
+			yield();
 		}
 
-		writeln("\033[Ggot a char!", bufStr, " ", readRes.status);
-	}
+		writeln("writing to test.txt");
+		auto writeRes = fileWrite(testTxt.fd, 0, buf);
+		assert(writeRes.bytesRWd == 5);
+		writeln("write ", writeRes.status);
+	});
 }

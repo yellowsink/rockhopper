@@ -105,10 +105,14 @@ private class Reactor
 			// step 1.5: handle new fibers!
 			// if we have new fibers, don't stop and wait for the current fibers to finish blocking, there's more stuff to do!
 			// instead, just loop back round to the start and keep going
-			if (fibers.length > fiberCountBefore) continue;
+			auto newFibersAdded = fibers.length > fiberCountBefore;
 
 			// step 2: remove finished fibers
 			fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
+
+			// step 1.5 again: we have to remove finished fibers before we loop back around
+			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
+			if (newFibersAdded) continue;
 
 			// step 3: get fibers with blockers
 			auto fibersToRegister = fibers.filter!(f => !f.currentBlocker.isNull && !f.blockerRegistered).array;

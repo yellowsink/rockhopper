@@ -16,7 +16,6 @@ void sleep(Duration d)
   awaitBlocker(FiberBlocker.sleep(timer));
 }
 
-import std.stdio : File;
 import eventcore.driver : IOMode, FileFD;
 public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
 
