@@ -41,6 +41,7 @@ private union _FiberBlockerRaw
 	//string nsLookup;
 	//EventID ecThreadEvent;
 	BlockerFileOpen fileOpen;
+	FileFD fileClose;
 	BlockerFileRead fileRead;
 	BlockerFileWrite fileWrite;
 	//Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
@@ -86,7 +87,10 @@ public
 
 private union _BlockerReturnRaw
 {
+	import eventcore.driver : CloseStatus;
+
 	BlockerReturnFileOpen fileOpen;
+	CloseStatus fileClose;
 	BlockerReturnFileRW fileRW;
 	BlockerReturnSignalTrap signalTrap;
 	Object sleep; // basically empty but pretty sure `void` will cause... issues.

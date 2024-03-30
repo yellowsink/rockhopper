@@ -11,7 +11,7 @@ import std.datetime : Duration, dur;
 
 // file related imports
 import eventcore.driver : IOMode, FileFD;
-public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
+public import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus;
 
 // signal related imports
 public import eventcore.driver : SignalStatus;
@@ -29,6 +29,11 @@ void sleep(Duration d)
 BlockerReturnFileOpen fileOpen(string path, FileOpenMode mode)
 {
   return awaitBlocker(FiberBlocker.fileOpen(BlockerFileOpen(path, mode))).fileOpenValue;
+}
+
+CloseStatus fileClose(FileFD fd)
+{
+	return awaitBlocker(FiberBlocker.fileClose(fd)).fileCloseValue;
 }
 
 BlockerReturnFileRW fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
