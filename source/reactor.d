@@ -2,6 +2,7 @@ module reactor;
 
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
+import blockers : FiberBlocker, BlockerReturn;
 
 public {
 	void spawn(void delegate() fn)
@@ -53,40 +54,6 @@ public {
 		yield();
 	}
 }
-
-// === FIBER BLOCKER TYPE ===
-
-import std.typecons : Tuple, tuple;
-import taggedalgebraic : TaggedUnion;
-import eventcore.driver : EventID, FileFD, PipeFD, IOMode, ProcessID, TimerID, ExitReason, IOStatus, FileOpenMode, OpenStatus;
-
-private union _FiberBlockerRaw
-{
-	// TODO: implement more of these
-	//string nsLookup;
-	//EventID ecThreadEvent;
-	Tuple!(string, FileOpenMode) fileOpen;
-	Tuple!(FileFD, ulong, ubyte[], IOMode) fileRead;
-	//Tuple!(FileFD, ulong, const(ubyte)[], IOMode) fileWrite;
-	//Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
-	//Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
-	//ProcessID procWait;
-	//int signalTrap;
-	// TODO: sockets
-	TimerID sleep;
-	// TODO: directory watchers
-}
-
-public alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
-
-private union _BlockerReturnRaw
-{
-	Tuple!(FileFD, OpenStatus) fileOpen;
-	Tuple!(IOStatus, ulong) fileRead;
-	Object sleep; // basically empty but pretty sure `void` will cause... issues.
-}
-
-public alias BlockerReturn = TaggedUnion!_BlockerReturnRaw;
 
 // === LAZY INIT ===
 
@@ -150,7 +117,11 @@ private class Reactor
 			foreach (f_; fibersToRegister)
 			{
 				// https://forum.dlang.org/post/wpnlxtpmsyltjjwmmctp@forum.dlang.org
-					(f) {
+				(f) {
+					import std.typecons : tuple;
+					import eventcore.driver : FileFD, TimerID, IOStatus, OpenStatus;
+					import blockers : BlockerReturnFileOpen, BlockerReturnFileRead;
+
 					f.blockerRegistered = true;
 					// TODO: support blockers other than `sleep`
 					auto blocker = f.currentBlocker.get;
@@ -167,29 +138,27 @@ private class Reactor
 							break;
 
 						case FiberBlocker.Kind.fileRead:
-							auto fd = blocker.fileReadValue[0];
-							auto oset = blocker.fileReadValue[1];
-							auto buf = blocker.fileReadValue[2];
-							auto mode = blocker.fileReadValue[3];
+							auto bfr = blocker.fileReadValue;
 
-							eventDriver.files.read(fd, oset, buf, mode, (FileFD _fd, IOStatus status, ulong read) nothrow{
-								assert(fd == _fd);
+							eventDriver.files.read(bfr.fd, bfr.offset, bfr.buf, bfr.ioMode, (FileFD _fd, IOStatus status, ulong read) nothrow{
+								assert(bfr.fd == _fd);
 
-								f.blockerResult = BlockerReturn.fileRead(tuple(status, read));
+								f.blockerResult = BlockerReturn.fileRead(BlockerReturnFileRead(status, read));
 							});
 							break;
 
 						case FiberBlocker.Kind.fileOpen:
-							auto path = blocker.fileOpenValue[0];
-							auto mode = blocker.fileOpenValue[1];
+							auto bfo = blocker.fileOpenValue;
 
-							eventDriver.files.open(path, mode, (FileFD fd, OpenStatus status) nothrow{
-								f.blockerResult = BlockerReturn.fileOpen(tuple(fd, status));
+							eventDriver.files.open(bfo.path, bfo.mode, (FileFD fd, OpenStatus status) nothrow{
+								f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
 							});
 							break;
 					}
 				}(f_);
 			}
+
+			import eventcore.driver : ExitReason;
 
 			// step 5: run event loop!
 			// when processEvents is called with no params, will wait unless none are queued

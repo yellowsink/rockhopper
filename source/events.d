@@ -1,6 +1,7 @@
 module events;
 
-import reactor : FiberBlocker, awaitBlocker;
+import reactor : awaitBlocker;
+import blockers : FiberBlocker, BlockerFileOpen, BlockerFileRead, BlockerReturnFileOpen, BlockerReturnFileRead;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 
@@ -19,14 +20,14 @@ import std.stdio : File;
 import eventcore.driver : IOMode, FileFD;
 public import eventcore.driver : FileOpenMode, OpenStatus, IOStatus;
 
-Tuple!(FileFD, OpenStatus) fileOpen(string path, FileOpenMode mode)
+BlockerReturnFileOpen fileOpen(string path, FileOpenMode mode)
 {
-  return awaitBlocker(FiberBlocker.fileOpen(tuple(path, mode))).fileOpenValue;
+  return awaitBlocker(FiberBlocker.fileOpen(BlockerFileOpen(path, mode))).fileOpenValue;
 }
 
-Tuple!(IOStatus, ulong) fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
+BlockerReturnFileRead fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
 {
   alias mode = IOMode.once;
 
-  return awaitBlocker(FiberBlocker.fileRead(tuple(fd, oset, buffer, mode))).fileReadValue;
+  return awaitBlocker(FiberBlocker.fileRead(BlockerFileRead(fd, oset, buffer, mode))).fileReadValue;
 }

@@ -35,8 +35,6 @@ void mainAsync()
 	cfmakeraw(&optsRaw);
 	tcsetattr(STDIN_FILENO, TCSANOW, &optsRaw);
 
-	//auto openRes = fileOpen("/dev/stdin", FileOpenMode.read);
-	//writeln("opened stdin: ", openRes[1]);
 	import eventcore.core : eventDriver;
 	auto stdin = eventDriver.files.adopt(STDIN_FILENO);
 
@@ -51,6 +49,6 @@ void mainAsync()
 			earlyExit();
 		}
 
-		writeln("\033[Ggot a char!", bufStr, " ", readRes[1]);
+		writeln("\033[Ggot a char!", bufStr, " ", readRes.status);
 	}
 }
