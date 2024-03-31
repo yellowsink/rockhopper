@@ -130,7 +130,7 @@ private class Reactor
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
-		import blockers : BlockerReturnFileOpen, BlockerReturnFileRW, BlockerReturnSignalTrap, BlockerReturnNsLookup;
+		import blockers : BlockerReturnFileOpen, BlockerReturnRW, BlockerReturnSignalTrap;
 
 		// don't register a callback if there is nothing to register, or it's already done.
 		if (f.currentBlocker.isNull || f.blockerRegistered)
@@ -175,7 +175,17 @@ private class Reactor
 			eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, read) nothrow{
 				assert(b.fd == _fd);
 
-				f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, read));
+				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, read));
+			});
+			break;
+
+		case FiberBlocker.Kind.pipeRead:
+			auto b = genericBlocker.pipeReadValue;
+
+			eventDriver.pipes.read(b.fd, b.buf, b.ioMode, (_fd, status, read) nothrow{
+				assert(b.fd == _fd);
+
+				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, read));
 			});
 			break;
 
@@ -185,7 +195,17 @@ private class Reactor
 			eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, written) nothrow{
 				assert(b.fd == _fd);
 
-				f.blockerResult = BlockerReturn.fileRW(BlockerReturnFileRW(status, written));
+				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, written));
+			});
+			break;
+
+		case FiberBlocker.Kind.pipeWrite:
+			auto b = genericBlocker.pipeWriteValue;
+
+			eventDriver.pipes.write(b.fd, b.buf, b.ioMode, (_fd, status, written) nothrow{
+				assert(b.fd == _fd);
+
+				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, written));
 			});
 			break;
 

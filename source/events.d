@@ -9,8 +9,8 @@ import std.typecons : Tuple, tuple;
 // dns related imports
 //public import eventcore.driver : DNSStatus, RefAddress;
 
-// file related imports
-import eventcore.driver : IOMode, FileFD;
+// file/pipe related imports
+import eventcore.driver : IOMode, FileFD, PipeFD;
 public import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus;
 
 // signal related imports
@@ -34,18 +34,32 @@ CloseStatus fileClose(FileFD fd)
 	return awaitBlocker(FiberBlocker.fileClose(fd)).fileCloseValue;
 }
 
-BlockerReturnFileRW fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
+BlockerReturnRW fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode */)
 {
   alias mode = IOMode.once;
 
-  return awaitBlocker(FiberBlocker.fileRead(BlockerFileRead(fd, oset, buffer, mode))).fileRWValue;
+  return awaitBlocker(FiberBlocker.fileRead(BlockerFileRead(fd, oset, buffer, mode))).rwValue;
 }
 
-BlockerReturnFileRW fileWrite(FileFD fd, ulong oset, const(ubyte)[] buffer/* , IOMode mode */)
+BlockerReturnRW pipeRead(PipeFD fd, ubyte[] buffer/* , IOMode mode */)
+{
+  alias mode = IOMode.once;
+
+  return awaitBlocker(FiberBlocker.pipeRead(BlockerPipeRead(fd, 0, buffer, mode))).rwValue;
+}
+
+BlockerReturnRW fileWrite(FileFD fd, ulong oset, const(ubyte)[] buffer/* , IOMode mode */)
 {
 	alias mode = IOMode.once;
 
-	return awaitBlocker(FiberBlocker.fileWrite(BlockerFileWrite(fd, oset, buffer, mode))).fileRWValue;
+	return awaitBlocker(FiberBlocker.fileWrite(BlockerFileWrite(fd, oset, buffer, mode))).rwValue;
+}
+
+BlockerReturnRW pipeWrite(PipeFD fd, const(ubyte)[] buffer/* , IOMode mode */)
+{
+	alias mode = IOMode.once;
+
+	return awaitBlocker(FiberBlocker.pipeWrite(BlockerPipeWrite(fd, 0, buffer, mode))).rwValue;
 }
 
 SignalStatus signalTrap(int sig)

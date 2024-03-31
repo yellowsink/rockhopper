@@ -19,7 +19,7 @@ private
 	struct BlockerWrite(FD)
 	{
 		FD fd;
-		ulong offset;
+		ulong offset; // only used for files, ignored for pipes
 		const(ubyte)[] buf;
 		IOMode ioMode;
 	}
@@ -36,9 +36,9 @@ public
 	}
 
 	alias BlockerFileRead = BlockerRead!FileFD;
-	//alias BlockerPipeRead = BlockerRead!PipeFD;
+	alias BlockerPipeRead = BlockerRead!PipeFD;
 	alias BlockerFileWrite = BlockerWrite!FileFD;
-	//alias BlockerPipeWrite = BlockerWrite!PipeFD;
+	alias BlockerPipeWrite = BlockerWrite!PipeFD;
 }
 
 // TODO: test the following
@@ -57,9 +57,9 @@ private union _FiberBlockerRaw
 	BlockerFileOpen fileOpen;
 	FileFD fileClose;
 	BlockerFileRead fileRead;
+	BlockerPipeRead pipeRead;
 	BlockerFileWrite fileWrite;
-	//Tuple!(PipeFD, ulong, ubyte[], IOMode) pipeRead;
-	//Tuple!(PipeFD, ulong, const(ubyte)[], IOMode) pipeWrite;
+	BlockerPipeWrite pipeWrite;
 	//ProcessID procWait;
 	int signalTrap;
 	// TODO: sockets
@@ -89,7 +89,7 @@ public
 		OpenStatus status;
 	}
 
-	struct BlockerReturnFileRW
+	struct BlockerReturnRW
 	{
 		import eventcore.driver : IOStatus;
 
@@ -114,7 +114,7 @@ private union _BlockerReturnRaw
 	//BlockerReturnNsLookup nsLookup;
 	BlockerReturnFileOpen fileOpen;
 	CloseStatus fileClose;
-	BlockerReturnFileRW fileRW;
+	BlockerReturnRW rw;
 	BlockerReturnSignalTrap signalTrap;
 	Object sleep; // basically empty but pretty sure `void` will cause... issues.
 }
