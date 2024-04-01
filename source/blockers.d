@@ -42,8 +42,6 @@ public
 }
 
 // TODO: test the following
-// - pipe read
-// - pipe write
 // - spawn
 // - wait
 
@@ -116,7 +114,7 @@ private union _BlockerReturnRaw
 	CloseStatus fileClose;
 	BlockerReturnRW rw;
 	BlockerReturnSignalTrap signalTrap;
-	Object sleep; // basically empty but pretty sure `void` will cause... issues.
+	int[0] sleep; // basically empty but `void` doesn't compile and `void[0]` causes... issues.
 }
 
 public alias BlockerReturn = TaggedUnion!_BlockerReturnRaw;

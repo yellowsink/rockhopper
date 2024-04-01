@@ -41,6 +41,9 @@ BlockerReturnRW fileRead(FileFD fd, ulong oset, ubyte[] buffer/* , IOMode mode *
   return awaitBlocker(FiberBlocker.fileRead(BlockerFileRead(fd, oset, buffer, mode))).rwValue;
 }
 
+// TODO: pipes are an absolute mess, if you don't close them etc they will just cause resource leak chaos
+//       we need a wrapper around them like phobos has File instead of FILE*
+//       unless we just make that part of the higher level api and the raw events api is just an impl detail... hm.
 BlockerReturnRW pipeRead(PipeFD fd, ubyte[] buffer/* , IOMode mode */)
 {
   alias mode = IOMode.once;

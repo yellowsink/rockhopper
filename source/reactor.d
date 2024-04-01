@@ -225,7 +225,7 @@ private class Reactor
 			eventDriver.timers.wait(timerId, (_timerId) nothrow{
 				assert(timerId == _timerId);
 
-				f.blockerResult = BlockerReturn.sleep(new Object);
+				f.blockerResult = BlockerReturn.sleep([]);
 			});
 			break;
 		}
