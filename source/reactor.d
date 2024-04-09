@@ -156,6 +156,16 @@ private class Reactor
 			});
 			break; */
 
+		case FiberBlocker.Kind.threadEvent:
+			auto evid = genericBlocker.threadEventValue;
+
+			eventDriver.events.wait(evid, (_evid) nothrow{
+				assert(evid == _evid);
+
+				f.blockerResult = BlockerReturn.threadEvent();
+			});
+			break;
+
 		case FiberBlocker.Kind.fileOpen:
 			auto b = genericBlocker.fileOpenValue;
 

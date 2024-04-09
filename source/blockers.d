@@ -42,17 +42,14 @@ public
 	alias BlockerPipeWrite = BlockerWrite!PipeFD;
 }
 
-// TODO: test the following
-// - spawn
-// - wait
 
 private union _FiberBlockerRaw
 {
-	import eventcore.driver : TimerID, ProcessID;
+	import eventcore.driver : TimerID, ProcessID, EventID;
 
 	// TODO: currently, nsLookup is disabled due to all returned addresses being null
 	//string nsLookup;
-	// TODO: eventcore thread events
+	EventID threadEvent;
 	BlockerFileOpen fileOpen;
 	FileFD fileClose;
 	BlockerFileRead fileRead;
@@ -111,6 +108,7 @@ private union _BlockerReturnRaw
 	import eventcore.driver : CloseStatus;
 
 	//BlockerReturnNsLookup nsLookup;
+	Void threadEvent;
 	BlockerReturnFileOpen fileOpen;
 	CloseStatus fileClose;
 	BlockerReturnRW rw;

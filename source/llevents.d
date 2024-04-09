@@ -11,6 +11,9 @@ import std.typecons : Tuple, tuple;
 // dns related imports
 //public import eventcore.driver : DNSStatus, RefAddress;
 
+// thread event related imports
+import eventcore.driver : EventID;
+
 // file/pipe related imports
 import eventcore.driver : IOMode, FileFD, PipeFD;
 public import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus;
@@ -28,6 +31,11 @@ import std.datetime : Duration, dur;
 {
 	return awaitBlocker(FiberBlocker.nsLookup(name)).nsLookupValue;
 } */
+
+void waitThreadEvent(EventID evid)
+{
+	awaitBlocker(FiberBlocker.threadEvent(evid));
+}
 
 BlockerReturnFileOpen fileOpen(string path, FileOpenMode mode)
 {

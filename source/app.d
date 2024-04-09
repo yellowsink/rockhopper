@@ -13,32 +13,20 @@ void main()
 void mainAsync()
 {
 	import eventcore.core : eventDriver;
+	import core.thread.osthread : Thread;
 
-	import std.process : spawnProcess, pipe, wait;
+	shared eid = eventDriver.events.create();
 
-	auto p = pipe();
+	new Thread({
+		Thread.sleep(dur!"msecs"(500));
 
-	auto pid = spawnProcess(["yay", "-Q"], std.stdio.stdin, p.writeEnd, p.writeEnd);
+		eventDriver.events.trigger(eid, true);
+	}).start();
 
-	auto adopted = eventDriver.processes.adopt(pid.processID);
+	auto before = MonoTime.currTime;
 
-	writeln("spawned process, waiting: ", pid.osHandle);
+	waitThreadEvent(eid); // TODO: <-- HANGS FOREVER!
+	// works as expected on a thread
 
-	auto tBefore = MonoTime.currTime;
-
-	auto res = processWait(adopted);
-
-	writeln("process exited with code ", res, ", took ", MonoTime.currTime - tBefore);
-
-	// read all output
-	import std.algorithm : count;
-	auto adoptedPipe = eventDriver.pipes.adopt(p.readEnd.fileno);
-	auto buf = new ubyte[10_000_000]; // lol
-	pipeRead(adoptedPipe, buf);
-	auto lines = buf.count(cast(ubyte) '\n');
-
-	p.close();
-	eventDriver.pipes.releaseRef(adoptedPipe); // must happpen AFTER close, just to make eventcore happy.
-
-	writeln("output had ", lines, " lines");
+	writeln("other thread triggered after ", MonoTime.currTime - before);
 }
