@@ -32,11 +32,13 @@ void mainAsync()
 
 	// read all output
 	import std.algorithm : count;
+	auto adoptedPipe = eventDriver.pipes.adopt(p.readEnd.fileno);
 	auto buf = new ubyte[10_000_000]; // lol
-	pipeRead(eventDriver.pipes.adopt(p.readEnd.fileno), buf);
+	pipeRead(adoptedPipe, buf);
 	auto lines = buf.count(cast(ubyte) '\n');
 
 	p.close();
+	eventDriver.pipes.releaseRef(adoptedPipe); // must happpen AFTER close, just to make eventcore happy.
 
 	writeln("output had ", lines, " lines");
 }

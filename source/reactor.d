@@ -120,11 +120,12 @@ private class Reactor
 			foreach (f; fibers)
 				registerCallbackIfNeeded(f);
 
-			// step 5: run event loop!
+			// step 6: run event loop!
 			// when processEvents is called with no params, will wait unless none are queued
 			// instead, we want to just wait indefinitely if there are no queued events, so pass Duration.max
+			// double check that fibers still exist! if all exited, then this would just hang forever.
 			// TODO: what is ExitReason.idle?
-			if (ExitReason.exited == eventDriver.core.processEvents(Duration.max)) break;
+			if (fibers.length && ExitReason.exited == eventDriver.core.processEvents(Duration.max)) break;
 		}
 	}
 
