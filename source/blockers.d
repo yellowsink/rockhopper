@@ -48,7 +48,7 @@ public
 
 private union _FiberBlockerRaw
 {
-	import eventcore.driver : TimerID/* , ProcessID */;
+	import eventcore.driver : TimerID, ProcessID;
 
 	// TODO: currently, nsLookup is disabled due to all returned addresses being null
 	//string nsLookup;
@@ -59,7 +59,7 @@ private union _FiberBlockerRaw
 	BlockerPipeRead pipeRead;
 	BlockerFileWrite fileWrite;
 	BlockerPipeWrite pipeWrite;
-	//ProcessID procWait;
+	ProcessID procWait;
 	int signalTrap;
 	// TODO: sockets
 	TimerID sleep;
@@ -114,6 +114,7 @@ private union _BlockerReturnRaw
 	BlockerReturnFileOpen fileOpen;
 	CloseStatus fileClose;
 	BlockerReturnRW rw;
+	int procWait;
 	BlockerReturnSignalTrap signalTrap;
 	Void sleep;
 }

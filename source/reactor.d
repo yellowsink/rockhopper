@@ -213,6 +213,16 @@ private class Reactor
 			});
 			break;
 
+		case FiberBlocker.Kind.procWait:
+			auto pid = genericBlocker.procWaitValue;
+
+			eventDriver.processes.wait(pid, (_pid, exitCode) nothrow{
+				assert(pid == _pid);
+
+				f.blockerResult = BlockerReturn.procWait(exitCode);
+			});
+			break;
+
 		case FiberBlocker.Kind.signalTrap:
 			auto sig = genericBlocker.signalTrapValue;
 
