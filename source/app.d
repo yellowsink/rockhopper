@@ -2,7 +2,7 @@ import std.stdio;
 import std.datetime : dur, MonoTime;
 
 import reactor;
-import events;
+import llevents;
 
 enum FILE_PATH = "/home/sink/Downloads/Pokemon Brilliant Diamond + Pokemon Shining Pearl [NSPs]/Pokemon Brilliant Diamond (NSP)(eShop).rar";
 

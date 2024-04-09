@@ -1,3 +1,4 @@
+// `reactor` contains the actual reactor implementation, and the thread-global reactor API
 module reactor;
 
 // === PUBLIC API ===
@@ -127,6 +128,9 @@ private class Reactor
 		}
 	}
 
+	// TODO: make registerCallbackIfNeeded more compile-time
+	//private void registerCallback()(WrappedFiber f){}
+
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
@@ -225,7 +229,7 @@ private class Reactor
 			eventDriver.timers.wait(timerId, (_timerId) nothrow{
 				assert(timerId == _timerId);
 
-				f.blockerResult = BlockerReturn.sleep([]);
+				f.blockerResult = BlockerReturn.sleep();
 			});
 			break;
 		}

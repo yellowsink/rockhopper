@@ -1,4 +1,5 @@
-module events;
+// `llevents` contains the lowest level APIs for interacting with rockhopper, other than using the reactor directly.
+module llevents;
 
 // general imports
 import reactor : awaitBlocker;

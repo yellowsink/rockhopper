@@ -1,7 +1,8 @@
+// `blockers` contains the types that are used by the reactor API to represent blocking tasks and their results
 module blockers;
 
 import std.typecons : Tuple, tuple;
-import taggedalgebraic : TaggedUnion;
+import taggedalgebraic : TaggedUnion, Void;
 import eventcore.driver : FileFD, PipeFD, IOMode;
 
 // === BLOCKER SENDS ===
@@ -114,7 +115,7 @@ private union _BlockerReturnRaw
 	CloseStatus fileClose;
 	BlockerReturnRW rw;
 	BlockerReturnSignalTrap signalTrap;
-	int[0] sleep; // basically empty but `void` doesn't compile and `void[0]` causes... issues.
+	Void sleep;
 }
 
 public alias BlockerReturn = TaggedUnion!_BlockerReturnRaw;
