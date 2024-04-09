@@ -12,22 +12,31 @@ void main()
 
 void mainAsync()
 {
-	import eventcore.core : eventDriver, ProcessRedirect, ProcessStderrRedirect, ProcessConfig, ProcessStdinFile, ProcessStdoutFile, ProcessStderrFile;
+	import eventcore.core : eventDriver;
 
-	auto p = eventDriver.processes.spawn(
-		["/bin/pacman", "-Q"],
-		ProcessStdinFile(ProcessRedirect.none),
-		ProcessStdoutFile(ProcessRedirect.pipe),
-		ProcessStderrFile(ProcessStderrRedirect.toStdout),
-		null, ProcessConfig.none, null);
+	import std.process : spawnProcess, pipe, wait;
 
-	writeln("spawned process, waiting: ", p.pid.value);
+	auto p = pipe();
+
+	auto pid = spawnProcess(["yay", "-Q"], std.stdio.stdin, p.writeEnd, p.writeEnd);
+
+	auto adopted = eventDriver.processes.adopt(pid.processID);
+
+	writeln("spawned process, waiting: ", pid.osHandle);
 
 	auto tBefore = MonoTime.currTime;
 
-	while (1) yield();
+	auto res = processWait(adopted);
 
-	//processWait(p.pid);
+	writeln("process exited with code ", res, ", took ", MonoTime.currTime - tBefore);
 
-	writeln("process exited, took ", MonoTime.currTime - tBefore);
+	// read all output
+	import std.algorithm : count;
+	auto buf = new ubyte[10_000_000]; // lol
+	pipeRead(eventDriver.pipes.adopt(p.readEnd.fileno), buf);
+	auto lines = buf.count(cast(ubyte) '\n');
+
+	p.close();
+
+	writeln("output had ", lines, " lines");
 }
