@@ -60,7 +60,7 @@ private union _FiberBlockerRaw
 	BlockerPipeWrite pipeWrite;
 	ProcessID procWait;
 	int signalTrap;
-	TODO sockConnect; // TODO: sockets
+	/* TODO sockConnect; // TODO: sockets
 	TODO sockListenWithoutOpts;
 	TODO sockListenWithOptions;
 	TODO sockRead;
@@ -68,7 +68,7 @@ private union _FiberBlockerRaw
 	TODO sockSend;
 	TODO sockWaitConns;
 	TODO sockWaitData;
-	TODO sockWrite;
+	TODO sockWrite; */
 	TimerID sleep;
 	// TODO: directory watchers
 }

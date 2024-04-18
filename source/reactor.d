@@ -244,9 +244,9 @@ private class Reactor
 			});
 			break;
 
-		case sockConnect:
+	/* 	case sockConnect:
 
-			break;
+			break; */
 
 		case sleep:
 			auto timerId = genericBlocker.sleepValue;
