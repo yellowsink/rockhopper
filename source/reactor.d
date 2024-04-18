@@ -144,7 +144,7 @@ private class Reactor
 		f.blockerRegistered = true;
 		auto genericBlocker = f.currentBlocker.get;
 
-		final switch (genericBlocker.kind)
+		final switch (genericBlocker.kind) with (FiberBlocker.Kind)
 		{
 		/* case FiberBlocker.Kind.nsLookup:
 			auto name = genericBlocker.nsLookupValue;
@@ -156,7 +156,7 @@ private class Reactor
 			});
 			break; */
 
-		case FiberBlocker.Kind.threadEvent:
+		case threadEvent:
 			auto evid = genericBlocker.threadEventValue;
 
 			eventDriver.events.wait(evid, (_evid) nothrow{
@@ -166,7 +166,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.fileOpen:
+		case fileOpen:
 			auto b = genericBlocker.fileOpenValue;
 
 			eventDriver.files.open(b.path, b.mode, (fd, status) nothrow{
@@ -174,7 +174,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.fileClose:
+		case fileClose:
 			auto fd = genericBlocker.fileCloseValue;
 
 			eventDriver.files.close(fd, (_fd, status) nothrow{
@@ -184,7 +184,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.fileRead:
+		case fileRead:
 			auto b = genericBlocker.fileReadValue;
 
 			eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, read) nothrow{
@@ -194,7 +194,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.pipeRead:
+		case pipeRead:
 			auto b = genericBlocker.pipeReadValue;
 
 			eventDriver.pipes.read(b.fd, b.buf, b.ioMode, (_fd, status, read) nothrow{
@@ -204,7 +204,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.fileWrite:
+		case fileWrite:
 			auto b = genericBlocker.fileWriteValue;
 
 			eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, written) nothrow{
@@ -214,7 +214,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.pipeWrite:
+		case pipeWrite:
 			auto b = genericBlocker.pipeWriteValue;
 
 			eventDriver.pipes.write(b.fd, b.buf, b.ioMode, (_fd, status, written) nothrow{
@@ -224,7 +224,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.procWait:
+		case procWait:
 			auto pid = genericBlocker.procWaitValue;
 
 			eventDriver.processes.wait(pid, (_pid, exitCode) nothrow{
@@ -234,7 +234,7 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.signalTrap:
+		case signalTrap:
 			auto sig = genericBlocker.signalTrapValue;
 
 			eventDriver.signals.listen(sig, (slID, status, _sigNum) {
@@ -244,7 +244,11 @@ private class Reactor
 			});
 			break;
 
-		case FiberBlocker.Kind.sleep:
+		case sockConnect:
+
+			break;
+
+		case sleep:
 			auto timerId = genericBlocker.sleepValue;
 
 			eventDriver.timers.wait(timerId, (_timerId) nothrow{

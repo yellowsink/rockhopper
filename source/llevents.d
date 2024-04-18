@@ -24,6 +24,16 @@ public import eventcore.driver : Process, ProcessID;
 // signal related imports
 public import eventcore.driver : SignalStatus;
 
+// sockets stuff
+import eventcore.driver : StreamSocketFD;
+public import eventcore.driver : ConnectStatus;
+import std.socket : Address;
+
+ConnectStatus sockConnect(Address peer, Address bind)
+{
+	return awaitBlocker(FiberBlocker.sockConnect(BlockerSockConnect(peer, bind))).sockConnectValue;
+}
+
 // sleep imports
 import std.datetime : Duration, dur;
 
