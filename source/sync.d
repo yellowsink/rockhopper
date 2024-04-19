@@ -1,12 +1,17 @@
-// `syncf` contains fiber synchronization primitives. They provide familiar looking sync tools with no thread safety.
+// `sync` contains fiber synchronization primitives.
+// They provide familiar looking sync tools with support for fibers, with optional thread safety.
 
-module syncf;
+// when thread safety is off, they are designed to be as low overhead and efficient as possible.
+//   (stack allocated structs without locks, etc)
+// when on, they can be shared across many threads' reactors. This has performance and DX side effects.
+
+module sync;
 
 import reactor : yield, spawn;
-import llevents : sleep;
+import llevents : sleep, waitThreadEvent;
 import std.datetime : Duration;
-import std.typecons : Nullable;
 import core.thread.fiber : Fiber;
+import core.atomic : atomicOp;
 
 // core.sync.event : Event
 struct FEvent
@@ -16,7 +21,7 @@ struct FEvent
 
 	bool isSignaled;
 
-	void set() { isSignaled = true; }
+	void notify() { isSignaled = true; }
 	void reset() { isSignaled = false; }
 
 	void wait()
@@ -36,6 +41,56 @@ struct FEvent
 		return isSignaled;
 	}
 }
+
+class TEvent
+{
+	import eventcore.core : eventDriver;
+	import eventcore.driver : EventID, EventDriver;
+
+	shared EventID ev;
+	shared bool triggered;
+	// storing a shared(EventDriver) lets us notify() and reset() from other threads
+	shared EventDriver sourceDriver;
+	this()
+	{
+		sourceDriver = cast(shared) eventDriver;
+		ev = eventDriver.events.create();
+	}
+
+	synchronized void notify()
+	{
+		triggered = true;
+		sourceDriver.events.trigger(ev, true);
+	}
+
+	synchronized void reset()
+	{
+		if (triggered)
+		{
+			// SHOULD be no active waits anymore
+			auto fail = sourceDriver.events.releaseRef(ev);
+			assert(!fail);
+
+			ev = sourceDriver.events.create();
+			triggered = false;
+		}
+		else
+		{
+			// resetting an event that has not been triggered is a no-op
+		}
+	}
+
+	void wait()
+	{
+		// if on a different thread, wait for the event
+		if (eventDriver != sourceDriver)
+			waitThreadEvent(ev);
+		else // else just yield a bit
+			while (!triggered) yield();
+
+		assert(triggered, "if the thread event resolves, triggered should be true!");
+	}
+} // TODO: test
 
 // this is like an FEvent however instead of just wrapping a bool, it keeps a count,
 // such that exactly as many wait()s are resolved as notify()s are called.
@@ -75,6 +130,73 @@ struct FSemaphore
 
 		count--;
 		return true;
+	}
+}
+
+// thread safe FSemaphore
+// TODO: work in progress, untested and probably not correct
+class TSemaphore
+{
+	shared uint count;
+
+	void notify()
+	{
+		atomicOp!"+="(count, 1);
+	}
+
+	synchronized bool tryWait()
+	{
+		if (count == 0)
+			return false;
+		atomicOp!"-="(count, 1);
+		return true;
+	}
+
+	void wait()
+	{
+		while(1)
+		{
+			auto done = false;
+			synchronized(this)
+			{
+				if (count > 0)
+				{
+					atomicOp!"+="(count, 1);
+					done = true;
+				}
+			}
+
+			if (done) break;
+			yield();
+		}
+	}
+
+	bool wait(Duration timeout)
+	{
+		bool timedOut;
+		spawn({
+			sleep(timeout);
+			timedOut = true;
+		});
+
+		while (!timedOut)
+		{
+			auto done = false;
+			synchronized (this)
+			{
+				if (count > 0)
+				{
+					atomicOp!"+="(count, 1);
+					done = true;
+				}
+			}
+
+			if (done)
+				break;
+			yield();
+		}
+
+		return !timedOut;
 	}
 }
 
