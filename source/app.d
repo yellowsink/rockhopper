@@ -3,6 +3,7 @@ import std.datetime : dur, MonoTime;
 
 import reactor;
 import llevents;
+import syncf;
 
 void main()
 {
@@ -12,22 +13,13 @@ void main()
 
 void mainAsync()
 {
-	import eventcore.core : eventDriver;
-	import core.thread.osthread : Thread;
+	FGuardedResult!uint res;
 
-	auto mainThreadDriver = cast(shared) eventDriver;
+	spawn({
+		sleep(dur!"msecs"(500));
 
-	auto eid = eventDriver.events.create();
+		res.set(9);
+	});
 
-	new Thread({
-		Thread.sleep(dur!"msecs"(500));
-
-		mainThreadDriver.events.trigger(eid, true);
-	}).start();
-
-	auto before = MonoTime.currTime;
-
-	waitThreadEvent(eid);
-
-	writeln("other thread triggered after ", MonoTime.currTime - before);
+	writeln(res.get); // .get waits for a value to be assigned
 }

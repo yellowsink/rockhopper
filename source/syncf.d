@@ -197,3 +197,58 @@ template fSynchronized(alias func)
 		}
 	}
 } // i learned templates from scratch for this, and i'm proud of the result :) -- sink
+
+// like std typecons Nullable!T but calling .get waits for a value
+// TODO: there has to be a better name for this surely
+struct FGuardedResult(T)
+{
+	@disable this(ref FGuardedResult); // see FEvent::this(ref FEvent)
+
+	bool hasValue;
+	T value;
+
+	void set(T val)
+	{
+		value = val;
+		hasValue = true;
+	}
+
+	void nullify() {
+		hasValue = false;
+		value = T.init;
+	}
+
+	T get()
+	{
+		while (!hasValue) yield();
+		return value;
+	}
+}
+
+// like a golang WaitGroup
+// while a semaphore releases one wait per notify (many notify -> many wait),
+// and an event releases all waits on one notify (one notify -> many wait),
+// a waitgroup holds waits until a set quantity of notifies have happened (many notify -> one wait)
+// tip: you can pass the initial amount of notifies required in the constructor instead of using add
+struct FWaitGroup
+{
+	@disable this(ref FWaitGroup); // see FEvent::this(ref FEvent)
+
+	uint count;
+
+	void add(uint amt)
+	{
+		count += amt;
+	}
+
+	void done()
+	{
+		assert(count > 0);
+		count--;
+	}
+
+	void wait()
+	{
+		while (count > 0) yield();
+	}
+}
