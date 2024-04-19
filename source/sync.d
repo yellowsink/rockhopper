@@ -42,7 +42,7 @@ struct FEvent
 	}
 }
 
-class TEvent
+shared class TEvent
 {
 	import eventcore.core : eventDriver;
 	import eventcore.driver : EventID, EventDriver;
@@ -53,40 +53,49 @@ class TEvent
 	shared EventDriver sourceDriver;
 	this()
 	{
+		// i'm pretty sure two threads can't construct the *same* class at once so i won't `synchronized` here
+		// you'd have to share a pointer and have two threads try to emplace it at once (?)
+
 		sourceDriver = cast(shared) eventDriver;
 		ev = eventDriver.events.create();
 	}
 
-	synchronized void notify()
+	import std.stdio;
+
+	/* synchronized */ void notify()
 	{
+		writeln("notify: try get lock");
+		synchronized(this) {
+			writeln("notify: got lock");
 		triggered = true;
 		sourceDriver.events.trigger(ev, true);
 	}
+		writeln("notify: released lock");
+	}
 
-	synchronized void reset()
+	/* synchronized */ void reset()
 	{
+		writeln("reset: try get lock");
+		synchronized(this) {
+			writeln("reset: got lock");
 		if (triggered)
 		{
-			// SHOULD be no active waits anymore
-			auto fail = sourceDriver.events.releaseRef(ev);
-			assert(!fail);
-
-			ev = sourceDriver.events.create();
+			sourceDriver = cast(shared) eventDriver; // we're the new source!
+			ev = eventDriver.events.create();
 			triggered = false;
 		}
 		else
 		{
-			// resetting an event that has not been triggered is a no-op
+			// resetting an event that has not been triggered is a no-op!
 		}
+	}
+	writeln("reset: released lock");
 	}
 
 	void wait()
 	{
-		// if on a different thread, wait for the event
-		if (eventDriver != sourceDriver)
-			waitThreadEvent(ev);
-		else // else just yield a bit
-			while (!triggered) yield();
+		if (triggered) return;
+		waitThreadEvent(ev);
 
 		assert(triggered, "if the thread event resolves, triggered should be true!");
 	}

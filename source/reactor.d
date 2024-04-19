@@ -124,8 +124,12 @@ private class Reactor
 			// when processEvents is called with no params, will wait unless none are queued
 			// instead, we want to just wait indefinitely if there are no queued events, so pass Duration.max
 			// double check that fibers still exist! if all exited, then this would just hang forever.
-			// TODO: what is ExitReason.idle?
 			if (fibers.length && ExitReason.exited == eventDriver.core.processEvents(Duration.max)) break;
+
+			// ExitReason.exited -> earlyExit()
+			//           .idle -> processed some events
+			//           .outOfWaiters -> no fibers have registered blockers (e.g. yield() without a blocker)
+			//           .timeout -> impossible, lol
 		}
 	}
 
