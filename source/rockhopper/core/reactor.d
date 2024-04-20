@@ -200,9 +200,48 @@ private struct Reactor
 			MIXIN_RES();
 			break;
 
-	/* 	case sockConnect:
+		case sockConnect:
+			mixin RegisterCallback!("sockConnect", "sockets.connectStream", ["v.peerAddress", "v.bindAddress"], 2, HandleArgumentPos.None, "SRSockConnect");
+			MIXIN_RES();
+			break;
 
-			break; */
+		case sockListen:
+			mixin RegisterCallback!("sockListen", "sockets.listenStream", ["v.bindAddress", "v.opts"], 3, HandleArgumentPos.None, "SRSockListen");
+			MIXIN_RES();
+			break;
+
+		case sockRead:
+			mixin RegisterCallback!("sockRead", "sockets.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
+			MIXIN_RES();
+			break;
+
+		case sockReceive:
+			// scope may be an issue here!
+			// assert(0, "not yet working");
+			mixin RegisterCallback!("sockReceive", "sockets.receive", ["v.fd", "v.buf", "v.ioMode"], 3, HandleArgumentPos.First, "SRSockSendReceive");
+			MIXIN_RES();
+			break;
+
+		case sockSend:
+			// assert(0, "not yet working"); // scope RefAddress
+			mixin RegisterCallback!("sockSend", "sockets.send", ["v.sock", "v.buf", "v.ioMode", "v.targetAddress"], 3, HandleArgumentPos.First, "SRSockSendReceive");
+			MIXIN_RES();
+			break;
+
+		case sockWaitConns:
+			mixin RegisterCallback!("sockWaitConns", "sockets.waitForConnections", ["v"], 2, HandleArgumentPos.First, "SRSockWaitConns");
+			MIXIN_RES();
+			break;
+
+		case sockWaitData:
+			mixin RegisterCallback!("sockWaitData", "sockets.waitForData", ["v"], 2, HandleArgumentPos.First, "SRRW", "rw");
+			MIXIN_RES();
+			break;
+
+		case sockWrite:
+			mixin RegisterCallback!("sockWrite", "sockets.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
+			MIXIN_RES();
+			break;
 
 		case sleep:
 			mixin RegisterCallback!("sleep", "timers.wait", ["v"], 0);
@@ -287,7 +326,7 @@ private mixin template RegisterCallback(
 			sEdFuncName ~ "(" ~ sEdArgs ~ ", (" ~ sCbargs ~ ") nothrow {"
 				~ sAssert
 				~ "f.suspendResult = SuspendReturn." ~ (returnOverride.length ? returnOverride : enumName) ~ "(" ~ sReturnVal ~ ");"
-				~ "});"
+			~ "});"
 		);
 	}
 }

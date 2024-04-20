@@ -7,7 +7,7 @@ module rockhopper.core.suspends;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion, Void;
-import eventcore.driver : FileFD, PipeFD, IOMode;
+import eventcore.driver : FileFD, PipeFD, IOMode, StreamSocketFD, DatagramSocketFD;
 
 // === SENDS ===
 
@@ -28,6 +28,32 @@ private
 		const(ubyte)[] buf;
 		IOMode ioMode;
 	}
+
+	struct SSSockConnect
+	{
+		import std.socket : Address;
+		Address peerAddress;
+		Address bindAddress;
+	}
+
+	struct SSSockListen
+	{
+		import std.socket : Address;
+		import eventcore.driver : StreamListenOptions;
+
+		scope Address bindAddress;
+		StreamListenOptions opts;
+	}
+
+	struct SSSockSend
+	{
+		import std.socket : Address;
+
+		DatagramSocketFD sock;
+		const(ubyte)[] buf;
+		IOMode ioMode;
+		Address targetAddress;
+	}
 }
 
 public
@@ -42,16 +68,18 @@ public
 
 	alias SSFileRead = SSRead!FileFD;
 	alias SSPipeRead = SSRead!PipeFD;
+	alias SSSockRead = SSRead!StreamSocketFD;
+	alias SSSockReceive = SSRead!DatagramSocketFD;
 	alias SSFileWrite = SSWrite!FileFD;
 	alias SSPipeWrite = SSWrite!PipeFD;
+	alias SSSockWrite = SSWrite!StreamSocketFD;
 }
 
 
 private union _SSRaw
 {
-	import eventcore.driver : TimerID, ProcessID, EventID;
-
-	struct TODO {}
+	import eventcore.driver : TimerID, ProcessID, EventID, StreamListenSocketFD;
+	import std.socket : Address;
 
 	// TODO: currently, nsLookup is disabled due to all returned addresses being null
 	//string nsLookup;
@@ -64,15 +92,14 @@ private union _SSRaw
 	SSPipeWrite pipeWrite;
 	ProcessID procWait;
 	int signalTrap;
-	/* TODO sockConnect; // TODO: sockets
-	TODO sockListenWithoutOpts;
-	TODO sockListenWithOptions;
-	TODO sockRead;
-	TODO sockReceive;
-	TODO sockSend;
-	TODO sockWaitConns;
-	TODO sockWaitData;
-	TODO sockWrite; */
+	SSSockConnect sockConnect; // TODO: test
+	SSSockListen sockListen; // does this call the cb many times?? // TODO: test
+	SSSockRead sockRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
+	SSSockReceive sockReceive; // TODO: test
+	SSSockSend sockSend; // TODO: test
+	StreamListenSocketFD sockWaitConns; // does this call the cb many times?? // TODO: test
+	StreamSocketFD sockWaitData; // TODO: test
+	SSSockWrite sockWrite; // wrap this in an fSynchronized! when exposed at a high level // TODO: test
 	TimerID sleep;
 	// TODO: directory watchers
 }
@@ -108,6 +135,41 @@ public
 		ulong bytesRWd;
 	}
 
+	struct SRSockConnect
+	{
+		import eventcore.driver : ConnectStatus;
+
+		StreamSocketFD fd;
+		ConnectStatus status;
+	}
+
+	struct SRSockSendReceive
+	{
+		import eventcore.driver : IOStatus, RefAddress;
+
+		IOStatus status;
+		// 0 if error
+		ulong bytesRWd;
+		scope RefAddress addr;
+	}
+
+	struct SRSockListen
+	{
+		import eventcore.driver : StreamListenSocketFD, RefAddress;
+
+		StreamListenSocketFD listenFd;
+		StreamSocketFD sockFd;
+		RefAddress addr;
+	}
+
+	struct SRSockWaitConns
+	{
+		import eventcore.driver : RefAddress;
+
+		StreamSocketFD fd;
+		RefAddress addr;
+	}
+
 	struct SRSignalTrap
 	{
 		import eventcore.driver : SignalListenID, SignalStatus;
@@ -128,6 +190,11 @@ private union _SRRaw
 	SRRW rw;
 	int procWait;
 	SRSignalTrap signalTrap;
+	SRSockConnect sockConnect;
+	StreamListenSocketFD sockListen;
+	SRSockSendReceive sockReceive;
+	SRSockSendReceive sockSend;
+	SRSockWaitConns sockWaitConns;
 	Void sleep;
 }
 
