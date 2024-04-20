@@ -1,16 +1,19 @@
-// `blockers` contains the types that are used by the reactor API to represent blocking tasks and their results.
-// both this and awaitBlocker() can be considered implementation details of llevents, but are exposed nonetheless.
-module rockhopper.core.blockers;
+// `suspends` contains the types that are used by the reactor API to represent blocking tasks and their results.
+// both this and llawait() can be considered implementation details of llevents, but are exposed nonetheless.
+// a "suspend" refers to a reason for your fiber to be on hold by the reactor
+// not to be confused with a "suspend send", an object representing a suspend, sent to the reactor
+// and a "suspend return" is sent back to the fiber from the reactor once it has been fulfilled.
+module rockhopper.core.suspends;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion, Void;
 import eventcore.driver : FileFD, PipeFD, IOMode;
 
-// === BLOCKER SENDS ===
+// === SENDS ===
 
 private
 {
-	struct BlockerRead(FD)
+	struct SSRead(FD)
 	{
 		FD fd;
 		ulong offset;
@@ -18,7 +21,7 @@ private
 		IOMode ioMode;
 	}
 
-	struct BlockerWrite(FD)
+	struct SSWrite(FD)
 	{
 		FD fd;
 		ulong offset; // only used for files, ignored for pipes
@@ -29,7 +32,7 @@ private
 
 public
 {
-	struct BlockerFileOpen
+	struct SSFileOpen
 	{
 		import eventcore.driver : FileOpenMode;
 
@@ -37,28 +40,28 @@ public
 		FileOpenMode mode;
 	}
 
-	alias BlockerFileRead = BlockerRead!FileFD;
-	alias BlockerPipeRead = BlockerRead!PipeFD;
-	alias BlockerFileWrite = BlockerWrite!FileFD;
-	alias BlockerPipeWrite = BlockerWrite!PipeFD;
+	alias SSFileRead = SSRead!FileFD;
+	alias SSPipeRead = SSRead!PipeFD;
+	alias SSFileWrite = SSWrite!FileFD;
+	alias SSPipeWrite = SSWrite!PipeFD;
 }
 
 
-private union _FiberBlockerRaw
+private union _SSRaw
 {
 	import eventcore.driver : TimerID, ProcessID, EventID;
 
-  struct TODO {}
+	struct TODO {}
 
 	// TODO: currently, nsLookup is disabled due to all returned addresses being null
 	//string nsLookup;
 	EventID threadEvent;
-	BlockerFileOpen fileOpen;
+	SSFileOpen fileOpen;
 	FileFD fileClose;
-	BlockerFileRead fileRead;
-	BlockerPipeRead pipeRead;
-	BlockerFileWrite fileWrite;
-	BlockerPipeWrite pipeWrite;
+	SSFileRead fileRead;
+	SSPipeRead pipeRead;
+	SSFileWrite fileWrite;
+	SSPipeWrite pipeWrite;
 	ProcessID procWait;
 	int signalTrap;
 	/* TODO sockConnect; // TODO: sockets
@@ -74,13 +77,13 @@ private union _FiberBlockerRaw
 	// TODO: directory watchers
 }
 
-public alias FiberBlocker = TaggedUnion!_FiberBlockerRaw;
+public alias SuspendSend = TaggedUnion!_SSRaw;
 
-// === BLOCKER RETURNS ===
+// === RETURNS ===
 
 public
 {
-	/* struct BlockerReturnNsLookup
+	/* struct SRNsLookup
 	{
 		import eventcore.driver : DNSStatus, RefAddress;
 
@@ -88,7 +91,7 @@ public
 		RefAddress[] addresses;
 	} */
 
-	struct BlockerReturnFileOpen
+	struct SRFileOpen
 	{
 		import eventcore.driver : OpenStatus;
 
@@ -96,7 +99,7 @@ public
 		OpenStatus status;
 	}
 
-	struct BlockerReturnRW
+	struct SRRW
 	{
 		import eventcore.driver : IOStatus;
 
@@ -105,7 +108,7 @@ public
 		ulong bytesRWd;
 	}
 
-	struct BlockerReturnSignalTrap
+	struct SRSignalTrap
 	{
 		import eventcore.driver : SignalListenID, SignalStatus;
 
@@ -114,18 +117,18 @@ public
 	}
 }
 
-private union _BlockerReturnRaw
+private union _SRRaw
 {
 	import eventcore.driver : CloseStatus;
 
-	//BlockerReturnNsLookup nsLookup;
+	//SRNsLookup nsLookup;
 	Void threadEvent;
-	BlockerReturnFileOpen fileOpen;
+	SRFileOpen fileOpen;
 	CloseStatus fileClose;
-	BlockerReturnRW rw;
+	SRRW rw;
 	int procWait;
-	BlockerReturnSignalTrap signalTrap;
+	SRSignalTrap signalTrap;
 	Void sleep;
 }
 
-public alias BlockerReturn = TaggedUnion!_BlockerReturnRaw;
+public alias SuspendReturn = TaggedUnion!_SRRaw;

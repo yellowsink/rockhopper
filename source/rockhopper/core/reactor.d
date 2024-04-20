@@ -3,7 +3,7 @@ module rockhopper.core.reactor;
 
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
-import rockhopper.core.blockers : FiberBlocker, BlockerReturn;
+import rockhopper.core.suspends : SuspendSend, SuspendReturn;
 
 public {
 	void spawn(void delegate() fn)
@@ -26,22 +26,22 @@ public {
 	// Fiber.yield() for convenience
 	alias yield = Fiber.yield;
 
-	// return type must be the same as blockerResult
-	// The function called to await on a blocker. You MUST use this function to do so.
-	BlockerReturn awaitBlocker(FiberBlocker bl)
+	// return type must be the same as WrappedFiber.suspendResult
+	// This function informs the reactor to pause your fiber and potentially entire thread on the given suspend.
+	SuspendReturn llawait(SuspendSend bl)
 	{
 		assert(!reactor._currentFiber.isNull);
 		auto cf = reactor._currentFiber.get;
 
-		assert(cf.currentBlocker.isNull);
-		cf.currentBlocker = bl;
-		cf.blockerResult.nullify();
+		assert(cf.currentSuspend.isNull);
+		cf.currentSuspend = bl;
+		cf.suspendResult.nullify();
 
-		while (cf.blockerResult.isNull) yield();
+		while (cf.suspendResult.isNull) yield();
 
-		auto res = cf.blockerResult.get;
-		cf.currentBlocker.nullify();
-		cf.blockerRegistered = false;
+		auto res = cf.suspendResult.get;
+		cf.currentSuspend.nullify();
+		cf.suspendRegistered = false;
 
 		return res;
 	}
@@ -128,7 +128,7 @@ private class Reactor
 
 			// ExitReason.exited -> earlyExit()
 			//           .idle -> processed some events
-			//           .outOfWaiters -> no fibers have registered blockers (e.g. yield() without a blocker)
+			//           .outOfWaiters -> no fibers have registered suspends (e.g. yield() without a suspend)
 			//           .timeout -> impossible, lol
 		}
 	}
@@ -138,18 +138,18 @@ private class Reactor
 		import eventcore.core : eventDriver;
 
 		// don't register a callback if there is nothing to register, or it's already done.
-		if (f.currentBlocker.isNull || f.blockerRegistered)
+		if (f.currentSuspend.isNull || f.suspendRegistered)
 			return;
 
-		f.blockerRegistered = true;
-		auto genericBlocker = f.currentBlocker.get;
+		f.suspendRegistered = true;
+		auto relevantSuspend = f.currentSuspend.get;
 
-		final switch (genericBlocker.kind) with (FiberBlocker.Kind)
+		final switch (relevantSuspend.kind) with (SuspendSend.Kind)
 		{
 		/* case nsLookup:
 			// the mixin actually cannot handle this case yet - we need to drop an argument
 			// oh well, easy to add later.
-			mixin RegisterCallback!("nsLookup", "dns.lookupHost", ["v"], 3, HandleArgumentPos.None, "BlockerReturnNsLookup");
+			mixin RegisterCallback!("nsLookup", "dns.lookupHost", ["v"], 3, HandleArgumentPos.None, "SRNsLookup");
 			MIXIN_RES();
 			break; */
 
@@ -159,7 +159,7 @@ private class Reactor
 			break;
 
 		case fileOpen:
-			mixin RegisterCallback!("fileOpen", "files.open", ["v.path", "v.mode"], 2, HandleArgumentPos.None, "BlockerReturnFileOpen");
+			mixin RegisterCallback!("fileOpen", "files.open", ["v.path", "v.mode"], 2, HandleArgumentPos.None, "SRFileOpen");
 			MIXIN_RES();
 			break;
 
@@ -170,22 +170,22 @@ private class Reactor
 			break;
 
 		case fileRead:
-			mixin RegisterCallback!("fileRead", "files.read", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			mixin RegisterCallback!("fileRead", "files.read", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 
 		case pipeRead:
-			mixin RegisterCallback!("pipeRead", "pipes.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			mixin RegisterCallback!("pipeRead", "pipes.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 
 		case fileWrite:
-			mixin RegisterCallback!("fileWrite", "files.write", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			mixin RegisterCallback!("fileWrite", "files.write", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 
 		case pipeWrite:
-			mixin RegisterCallback!("pipeWrite", "pipes.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			mixin RegisterCallback!("pipeWrite", "pipes.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 
@@ -196,7 +196,7 @@ private class Reactor
 
 
 		case signalTrap:
-			mixin RegisterCallback!("signalTrap", "signals.listen", ["v"], 2, HandleArgumentPos.Last, "BlockerReturnSignalTrap");
+			mixin RegisterCallback!("signalTrap", "signals.listen", ["v"], 2, HandleArgumentPos.Last, "SRSignalTrap");
 			MIXIN_RES();
 			break;
 
@@ -219,18 +219,18 @@ private class Reactor
 		}
 
 		Fiber fiber;
-		// when unset, fiber is unblocked, when set, the blocker the fiber is waiting on
-		Nullable!FiberBlocker currentBlocker;
-		// if the current blocker has had its callback registered or not
-		bool blockerRegistered;
-		// when set, the result of the blocker (file data, etc) to be passed back to the fiber
-		Nullable!BlockerReturn blockerResult;
+		// when unset, fiber is unblocked, when set, the suspend the fiber is waiting on
+		Nullable!SuspendSend currentSuspend;
+		// if the current suspend has had its callback registered or not
+		bool suspendRegistered;
+		// when set, the result of the suspend (file data, etc) to be passed back to the fiber
+		Nullable!SuspendReturn suspendResult;
 	}
 }
 
 // === MIXIN FOR NEATER REGISTERING OF CALLBACKS ===
 
-// TODO: make registering callbacks more compile-time than this is already (maybe ct-ify all of blockers.d)
+// TODO: make registering callbacks more compile-time than this is already (maybe ct-ify all of suspends.d)
 private enum HandleArgumentPos
 {
 	// this enum should ONLY exist at compile time or something has gone VERY wrong.
@@ -240,7 +240,7 @@ private enum HandleArgumentPos
 }
 
 private mixin template RegisterCallback(
-	// name of blocker enums, and name of function on the event driver
+	// name of suspend enums, and name of function on the event driver
 	string enumName, string edName,
 	// args to event driver and back from callback (not including repeat)
 	string[] edArgs, int cbArgCount,
@@ -271,7 +271,7 @@ private mixin template RegisterCallback(
 	// you're only allowed to make declarations in a mixin template, not statements :(
 	void MIXIN_RES()
 	{
-		auto v = mixin("genericBlocker." ~ enumName ~ "Value");
+		auto v = mixin("relevantSuspend." ~ enumName ~ "Value");
 
 		// for some reason the ide support hates using an IES so I won't
 		enum sEdFuncName = "eventDriver." ~ edName;
@@ -279,13 +279,13 @@ private mixin template RegisterCallback(
 		enum sCbargs = cbArgsPadded.join(",");
 		// assume first argument to event driver is the one we're testing against
 		enum sAssert = (hap == HandleArgumentPos.None ? "" : "assert(__handle==" ~ edArgs[0] ~ ");");
-		enum sImportedExtraCons = "imported!\"rockhopper.core.blockers\"." ~ extraCons;
+		enum sImportedExtraCons = "imported!\"rockhopper.core.suspends\"." ~ extraCons;
 		enum sReturnVal = extraCons.length ? (sImportedExtraCons ~ "(" ~ cbArgs.join(",") ~ ")") : cbArgs.join(",");
 
 		mixin(
 			sEdFuncName ~ "(" ~ sEdArgs ~ ", (" ~ sCbargs ~ ") nothrow {"
 				~ sAssert
-				~ "f.blockerResult = BlockerReturn." ~ (returnOverride.length ? returnOverride : enumName) ~ "(" ~ sReturnVal ~ ");"
+				~ "f.suspendResult = SuspendReturn." ~ (returnOverride.length ? returnOverride : enumName) ~ "(" ~ sReturnVal ~ ");"
 				~ "});"
 		);
 	}
