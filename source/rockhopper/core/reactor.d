@@ -13,6 +13,8 @@ public {
 
 	void entrypoint(void delegate() fn)
 	{
+		assert(reactor.fibers.length == 0, "You can only have one entrypoint() call in flight at once on a reactor!");
+
 		spawn(fn);
 		reactor.loop();
 	}
@@ -30,7 +32,10 @@ public {
 	// This function informs the reactor to pause your fiber and potentially entire thread on the given suspend.
 	SuspendReturn llawait(SuspendSend bl)
 	{
-		assert(!reactor._currentFiber.isNull);
+		assert(
+			!reactor._currentFiber.isNull,
+			"You cannot await a suspend if you're not in a fiber (hint: wrap your code in entrypoint({}))"
+		);
 		auto cf = reactor._currentFiber.get;
 
 		assert(cf.currentSuspend.isNull);
@@ -52,7 +57,9 @@ public {
 		import eventcore.core : eventDriver;
 
 		eventDriver.core.exit();
-		yield();
+
+		if (!reactor._currentFiber.isNull)
+			yield(); // causes an instant exit when called inside a fiber, or just causes it to exit ASAP from outside
 	}
 }
 
