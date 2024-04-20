@@ -1,9 +1,9 @@
 // `sync` contains fiber synchronization primitives.
-// They provide familiar looking sync tools with support for fibers, with optional thread safety.
+// They provide familiar looking sync tools with support for fibers, ~~with optional thread safety~~.
 
 // when thread safety is off, they are designed to be as low overhead and efficient as possible.
 //   (stack allocated structs without locks, etc)
-// when on, they can be shared across many threads' reactors. This has performance and DX side effects.
+// ~~when on, they can be shared across many threads' reactors. This has performance and DX side effects.~~
 
 module sync;
 
@@ -42,14 +42,14 @@ struct FEvent
 	}
 }
 
-shared class TEvent
+/+shared class TEvent
 {
 	import eventcore.core : eventDriver;
 	import eventcore.driver : EventID, EventDriver;
 
 	shared EventID ev;
 	shared bool triggered;
-	// storing a shared(EventDriver) lets us notify() and reset() from other threads
+	// storing a shared(EventDriver) lets us notify() from other threads
 	shared EventDriver sourceDriver;
 	this()
 	{
@@ -62,22 +62,14 @@ shared class TEvent
 
 	import std.stdio;
 
-	/* synchronized */ void notify()
+	synchronized void notify()
 	{
-		writeln("notify: try get lock");
-		synchronized(this) {
-			writeln("notify: got lock");
 		triggered = true;
 		sourceDriver.events.trigger(ev, true);
 	}
-		writeln("notify: released lock");
-	}
 
-	/* synchronized */ void reset()
+	synchronized void reset()
 	{
-		writeln("reset: try get lock");
-		synchronized(this) {
-			writeln("reset: got lock");
 		if (triggered)
 		{
 			sourceDriver = cast(shared) eventDriver; // we're the new source!
@@ -89,8 +81,6 @@ shared class TEvent
 			// resetting an event that has not been triggered is a no-op!
 		}
 	}
-	writeln("reset: released lock");
-	}
 
 	void wait()
 	{
@@ -99,7 +89,7 @@ shared class TEvent
 
 		assert(triggered, "if the thread event resolves, triggered should be true!");
 	}
-} // TODO: test
+}+/
 
 // this is like an FEvent however instead of just wrapping a bool, it keeps a count,
 // such that exactly as many wait()s are resolved as notify()s are called.
@@ -144,7 +134,7 @@ struct FSemaphore
 
 // thread safe FSemaphore
 // TODO: work in progress, untested and probably not correct
-class TSemaphore
+/+class TSemaphore
 {
 	shared uint count;
 
@@ -207,7 +197,7 @@ class TSemaphore
 
 		return !timedOut;
 	}
-}
+}+/
 
 // core.sync.mutex : Mutex
 // this is a recursive mutex - the SAME FIBER ONLY can call lock() multiple times without deadlocking
