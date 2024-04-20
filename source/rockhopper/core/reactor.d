@@ -63,26 +63,19 @@ public {
 	}
 }
 
-// === LAZY INIT ===
-
-import std.typecons : Nullable;
-
-private {
-	Nullable!Reactor _reactorBacking;
-
-	Reactor reactor() @property // @suppress(dscanner.confusing.function_attributes)
-	{
-		if (_reactorBacking.isNull)
-			_reactorBacking = new Reactor;
-
-		return _reactorBacking.get;
-	}
-}
+private Reactor reactor;
 
 // === REACTOR IMPLEMENTATION ===
 
-private class Reactor
+private struct Reactor
 {
+	import std.typecons : Nullable;
+
+	// there should only ever be one reactor per thread, in TLS, and it is private to this module
+	// so it should not EVER be copied, but to make sure it isn't, this specifically prevents that.
+	// if this is ever a problem, reintroduce the old class lazy init thing but with a Reactor* instead.
+	@disable this(ref Reactor);
+
 	Nullable!WrappedFiber _currentFiber;
 
 	WrappedFiber[] fibers;
@@ -218,6 +211,7 @@ private class Reactor
 		}
 	}
 
+	// TODO: struct? maybe? perhaps...? to think about for later.
 	class WrappedFiber
 	{
 		this(void delegate() fn)
