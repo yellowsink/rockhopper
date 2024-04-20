@@ -1,10 +1,10 @@
 // `llevents` contains the lowest level APIs for interacting with rockhopper, other than using the reactor directly.
 //            does not cover all operations, as some things can be done synchronously from `eventDriver`.
-module core.llevents;
+module rockhopper.core.llevents;
 
 // general imports
-import core.reactor : awaitBlocker;
-import core.blockers;
+import rockhopper.core.reactor : awaitBlocker;
+import rockhopper.core.blockers;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 

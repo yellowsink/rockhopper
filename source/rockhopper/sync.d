@@ -5,10 +5,10 @@
 //   (stack allocated structs without locks, etc)
 // ~~when on, they can be shared across many threads' reactors. This has performance and DX side effects.~~
 
-module sync;
+module rockhopper.sync;
 
-import core.reactor : yield, spawn;
-import core.llevents : sleep, waitThreadEvent;
+import rockhopper.core.reactor : yield, spawn;
+import rockhopper.core.llevents : sleep, waitThreadEvent;
 import std.datetime : Duration;
 import core.thread.fiber : Fiber;
 import core.atomic : atomicOp;

@@ -1,9 +1,9 @@
 // `reactor` contains the actual reactor implementation, and the thread-global reactor API
-module core.reactor;
+module rockhopper.core.reactor;
 
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
-import core.blockers : FiberBlocker, BlockerReturn;
+import rockhopper.core.blockers : FiberBlocker, BlockerReturn;
 
 public {
 	void spawn(void delegate() fn)
@@ -279,7 +279,7 @@ private mixin template RegisterCallback(
 		enum sCbargs = cbArgsPadded.join(",");
 		// assume first argument to event driver is the one we're testing against
 		enum sAssert = (hap == HandleArgumentPos.None ? "" : "assert(__handle==" ~ edArgs[0] ~ ");");
-		enum sImportedExtraCons = "imported!\"core.blockers\"." ~ extraCons;
+		enum sImportedExtraCons = "imported!\"rockhopper.core.blockers\"." ~ extraCons;
 		enum sReturnVal = extraCons.length ? (sImportedExtraCons ~ "(" ~ cbArgs.join(",") ~ ")") : cbArgs.join(",");
 
 		mixin(

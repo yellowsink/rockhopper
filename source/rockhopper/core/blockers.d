@@ -1,5 +1,6 @@
-// `blockers` contains the types that are used by the reactor API to represent blocking tasks and their results
-module core.blockers;
+// `blockers` contains the types that are used by the reactor API to represent blocking tasks and their results.
+// both this and awaitBlocker() can be considered implementation details of llevents, but are exposed nonetheless.
+module rockhopper.core.blockers;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion, Void;

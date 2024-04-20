@@ -9,6 +9,12 @@ rockhopper.dll
 rockhopper.a
 rockhopper.lib
 rockhopper-test-*
+librockhopper.so
+librockhopper.dylib
+librockhopper.dll
+librockhopper.a
+librockhopper.lib
+librockhopper-test-*
 *.exe
 *.pdb
 *.o
