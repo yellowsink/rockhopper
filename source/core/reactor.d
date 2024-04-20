@@ -1,9 +1,9 @@
 // `reactor` contains the actual reactor implementation, and the thread-global reactor API
-module reactor;
+module core.reactor;
 
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
-import blockers : FiberBlocker, BlockerReturn;
+import core.blockers : FiberBlocker, BlockerReturn;
 
 public {
 	void spawn(void delegate() fn)
@@ -139,7 +139,7 @@ private class Reactor
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
-		import blockers : BlockerReturnFileOpen, BlockerReturnRW, BlockerReturnSignalTrap;
+		import core.blockers : BlockerReturnFileOpen, BlockerReturnRW, BlockerReturnSignalTrap;
 
 		// don't register a callback if there is nothing to register, or it's already done.
 		if (f.currentBlocker.isNull || f.blockerRegistered)

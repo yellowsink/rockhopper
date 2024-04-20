@@ -2,7 +2,7 @@
 
 module task;
 
-import reactor : spawn; // used in constructor and in then
+import core.reactor : spawn; // used in constructor and in then
 import sync : FEvent; // used for syncing the fibers
 
 import std.typecons : Nullable; // used by tryGetRes

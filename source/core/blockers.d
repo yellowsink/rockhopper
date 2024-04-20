@@ -1,5 +1,5 @@
 // `blockers` contains the types that are used by the reactor API to represent blocking tasks and their results
-module blockers;
+module core.blockers;
 
 import std.typecons : Tuple, tuple;
 import taggedalgebraic : TaggedUnion, Void;

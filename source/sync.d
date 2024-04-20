@@ -7,8 +7,8 @@
 
 module sync;
 
-import reactor : yield, spawn;
-import llevents : sleep, waitThreadEvent;
+import core.reactor : yield, spawn;
+import core.llevents : sleep, waitThreadEvent;
 import std.datetime : Duration;
 import core.thread.fiber : Fiber;
 import core.atomic : atomicOp;
