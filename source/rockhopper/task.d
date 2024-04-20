@@ -80,3 +80,8 @@ if (isSomeFunction!F && Parameters!F.length == 0)
 {
 	return Task!(ReturnType!F)(fn);
 }
+
+auto taskify(alias F)(Parameters!F params)
+{
+	return tSpawn({ return F(params); });
+}

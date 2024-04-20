@@ -22,20 +22,11 @@ import core.thread.osthread : Thread;
 void main()
 {
 	entrypoint({
-		auto vtask = tSpawn({
-			writeln("task says hi");
-			sleep(dur!"msecs"(500));
-		}).then({
-			writeln("async continuation!");
-		});
+		auto eepyTask = taskify!sleep(dur!"seconds"(5));
+		auto tBefore = MonoTime.currTime;
 
-		auto itask = tSpawn({
-			writeln("new task here");
-			return 5;
-		}).then((int v) => v > 6); // continuations can modify the value
+		eepyTask.waitRes(); // void
 
-		vtask.waitRes();
-
-		writeln(itask.waitRes());
+		writeln("eeped for ", MonoTime.currTime - tBefore);
 	});
 }
