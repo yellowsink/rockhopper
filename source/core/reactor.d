@@ -136,7 +136,6 @@ private class Reactor
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
-		import core.blockers : BlockerReturnFileOpen, BlockerReturnRW, BlockerReturnSignalTrap;
 
 		// don't register a callback if there is nothing to register, or it's already done.
 		if (f.currentBlocker.isNull || f.blockerRegistered)
@@ -147,111 +146,57 @@ private class Reactor
 
 		final switch (genericBlocker.kind) with (FiberBlocker.Kind)
 		{
-		/* case FiberBlocker.Kind.nsLookup:
-			auto name = genericBlocker.nsLookupValue;
-
-			eventDriver.dns.lookupHost(name, (_id, status, addresses) {
-
-
-				f.blockerResult = BlockerReturn.nsLookup(BlockerReturnNsLookup(status, addresses));
-			});
+		/* case nsLookup:
+			// the mixin actually cannot handle this case yet - we need to drop an argument
+			// oh well, easy to add later.
+			mixin RegisterCallback!("nsLookup", "dns.lookupHost", ["v"], 3, HandleArgumentPos.None, "BlockerReturnNsLookup");
+			MIXIN_RES();
 			break; */
 
 		case threadEvent:
-			auto evid = genericBlocker.threadEventValue;
-
-			eventDriver.events.wait(evid, (_evid) nothrow{
-				assert(evid == _evid);
-
-				f.blockerResult = BlockerReturn.threadEvent();
-			});
+			mixin RegisterCallback!("threadEvent", "events.wait", ["v"], 0);
+			MIXIN_RES();
 			break;
 
 		case fileOpen:
-			auto b = genericBlocker.fileOpenValue;
-
-			eventDriver.files.open(b.path, b.mode, (fd, status) nothrow{
-				f.blockerResult = BlockerReturn.fileOpen(BlockerReturnFileOpen(fd, status));
-			});
+			mixin RegisterCallback!("fileOpen", "files.open", ["v.path", "v.mode"], 2, HandleArgumentPos.None, "BlockerReturnFileOpen");
+			MIXIN_RES();
 			break;
 
-		/* case fileClose:
-			auto fd = genericBlocker.fileCloseValue;
-
-			eventDriver.files.close(fd, (_fd, status) nothrow{
-				assert(fd == _fd);
-
-				f.blockerResult = BlockerReturn.fileClose(status);
-			});
-			break; */
 
 		case fileClose:
-			mixin RegisterCallback!("fileClose", "files.close", HandleArgumentPos.First, ["v"], 1, "");
+			mixin RegisterCallback!("fileClose", "files.close", ["v"], 1);
 			MIXIN_RES();
 			break;
 
 		case fileRead:
-			auto b = genericBlocker.fileReadValue;
-
-			eventDriver.files.read(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, read) nothrow{
-				assert(b.fd == _fd);
-
-				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, read));
-			});
+			mixin RegisterCallback!("fileRead", "files.read", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			MIXIN_RES();
 			break;
 
 		case pipeRead:
-			auto b = genericBlocker.pipeReadValue;
-
-			eventDriver.pipes.read(b.fd, b.buf, b.ioMode, (_fd, status, read) nothrow{
-				assert(b.fd == _fd);
-
-				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, read));
-			});
+			mixin RegisterCallback!("pipeRead", "pipes.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			MIXIN_RES();
 			break;
 
 		case fileWrite:
-			auto b = genericBlocker.fileWriteValue;
-
-			eventDriver.files.write(b.fd, b.offset, b.buf, b.ioMode, (_fd, status, written) nothrow{
-				assert(b.fd == _fd);
-
-				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, written));
-			});
+			mixin RegisterCallback!("fileWrite", "files.write", ["v.fd", "v.offset", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			MIXIN_RES();
 			break;
 
 		case pipeWrite:
-			auto b = genericBlocker.pipeWriteValue;
-
-			eventDriver.pipes.write(b.fd, b.buf, b.ioMode, (_fd, status, written) nothrow{
-				assert(b.fd == _fd);
-
-				f.blockerResult = BlockerReturn.rw(BlockerReturnRW(status, written));
-			});
+			mixin RegisterCallback!("pipeWrite", "pipes.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "BlockerReturnRW", "rw");
+			MIXIN_RES();
 			break;
 
 		case procWait:
-			auto pid = genericBlocker.procWaitValue;
-
-			eventDriver.processes.wait(pid, (_pid, exitCode) nothrow{
-				assert(pid == _pid);
-
-				f.blockerResult = BlockerReturn.procWait(exitCode);
-			});
+			mixin RegisterCallback!("procWait", "processes.wait", ["v"], 1);
+			MIXIN_RES();
 			break;
 
-		/* case signalTrap:
-			auto sig = genericBlocker.signalTrapValue;
-
-			eventDriver.signals.listen(sig, (slID, status, _sigNum) {
-				assert(_sigNum == sig);
-
-				f.blockerResult = BlockerReturn.signalTrap(BlockerReturnSignalTrap(slID, status));
-			});
-			break; */
 
 		case signalTrap:
-			mixin RegisterCallback!("signalTrap", "signals.listen", HandleArgumentPos.Last, ["v"], 2, "BlockerReturnSignalTrap");
+			mixin RegisterCallback!("signalTrap", "signals.listen", ["v"], 2, HandleArgumentPos.Last, "BlockerReturnSignalTrap");
 			MIXIN_RES();
 			break;
 
@@ -260,13 +205,8 @@ private class Reactor
 			break; */
 
 		case sleep:
-			auto timerId = genericBlocker.sleepValue;
-
-			eventDriver.timers.wait(timerId, (_timerId) nothrow{
-				assert(timerId == _timerId);
-
-				f.blockerResult = BlockerReturn.sleep();
-			});
+			mixin RegisterCallback!("sleep", "timers.wait", ["v"], 0);
+			MIXIN_RES();
 			break;
 		}
 	}
@@ -302,12 +242,14 @@ private enum HandleArgumentPos
 private mixin template RegisterCallback(
 	// name of blocker enums, and name of function on the event driver
 	string enumName, string edName,
-	// if an arg of the callback is a repeat of the first param, where
-	HandleArgumentPos hap,
 	// args to event driver and back from callback (not including repeat)
 	string[] edArgs, int cbArgCount,
+	// if an arg of the callback is a repeat of the first param, where
+	HandleArgumentPos hap = HandleArgumentPos.First,
 	// if not "", the name of a function to pass the args to (to construct a struct or sm)
-	string extraCons
+	string extraCons = "",
+	// if the return type enum has a different name to the sender
+	string returnOverride = ""
 )
 {
 	import std.array : join, array;
@@ -337,12 +279,13 @@ private mixin template RegisterCallback(
 		enum sCbargs = cbArgsPadded.join(",");
 		// assume first argument to event driver is the one we're testing against
 		enum sAssert = (hap == HandleArgumentPos.None ? "" : "assert(__handle==" ~ edArgs[0] ~ ");");
-		enum sReturnVal = extraCons.length ? (extraCons ~ "(" ~ cbArgs.join(",") ~ ")") : cbArgs.join(",");
+		enum sImportedExtraCons = "imported!\"core.blockers\"." ~ extraCons;
+		enum sReturnVal = extraCons.length ? (sImportedExtraCons ~ "(" ~ cbArgs.join(",") ~ ")") : cbArgs.join(",");
 
 		mixin(
 			sEdFuncName ~ "(" ~ sEdArgs ~ ", (" ~ sCbargs ~ ") nothrow {"
 				~ sAssert
-				~ "f.blockerResult = BlockerReturn." ~ enumName ~ "(" ~ sReturnVal ~ ");"
+				~ "f.blockerResult = BlockerReturn." ~ (returnOverride.length ? returnOverride : enumName) ~ "(" ~ sReturnVal ~ ");"
 				~ "});"
 		);
 	}
