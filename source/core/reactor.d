@@ -133,9 +133,6 @@ private class Reactor
 		}
 	}
 
-	// TODO: make registerCallbackIfNeeded more compile-time
-	//private void registerCallback()(WrappedFiber f){}
-
 	private void registerCallbackIfNeeded(WrappedFiber f)
 	{
 		import eventcore.core : eventDriver;
@@ -178,7 +175,7 @@ private class Reactor
 			});
 			break;
 
-		case fileClose:
+		/* case fileClose:
 			auto fd = genericBlocker.fileCloseValue;
 
 			eventDriver.files.close(fd, (_fd, status) nothrow{
@@ -186,6 +183,11 @@ private class Reactor
 
 				f.blockerResult = BlockerReturn.fileClose(status);
 			});
+			break; */
+
+		case fileClose:
+			mixin RegisterCallback!("fileClose", "files.close", HandleArgumentPos.First, ["v"], 1, "");
+			MIXIN_RES();
 			break;
 
 		case fileRead:
@@ -238,7 +240,7 @@ private class Reactor
 			});
 			break;
 
-		case signalTrap:
+		/* case signalTrap:
 			auto sig = genericBlocker.signalTrapValue;
 
 			eventDriver.signals.listen(sig, (slID, status, _sigNum) {
@@ -246,6 +248,11 @@ private class Reactor
 
 				f.blockerResult = BlockerReturn.signalTrap(BlockerReturnSignalTrap(slID, status));
 			});
+			break; */
+
+		case signalTrap:
+			mixin RegisterCallback!("signalTrap", "signals.listen", HandleArgumentPos.Last, ["v"], 2, "BlockerReturnSignalTrap");
+			MIXIN_RES();
 			break;
 
 	/* 	case sockConnect:
@@ -278,5 +285,65 @@ private class Reactor
 		bool blockerRegistered;
 		// when set, the result of the blocker (file data, etc) to be passed back to the fiber
 		Nullable!BlockerReturn blockerResult;
+	}
+}
+
+// === MIXIN FOR NEATER REGISTERING OF CALLBACKS ===
+
+// TODO: make registering callbacks more compile-time than this is already (maybe ct-ify all of blockers.d)
+private enum HandleArgumentPos
+{
+	// this enum should ONLY exist at compile time or something has gone VERY wrong.
+	None,
+	First,
+	Last
+}
+
+private mixin template RegisterCallback(
+	// name of blocker enums, and name of function on the event driver
+	string enumName, string edName,
+	// if an arg of the callback is a repeat of the first param, where
+	HandleArgumentPos hap,
+	// args to event driver and back from callback (not including repeat)
+	string[] edArgs, int cbArgCount,
+	// if not "", the name of a function to pass the args to (to construct a struct or sm)
+	string extraCons
+)
+{
+	import std.array : join, array;
+	import std.range : iota;
+	import std.algorithm : map;
+	import std.conv : to;
+
+	static assert(edArgs.length, "should be some arguments to eventDriver.*.*()");
+
+	enum cbArgs = iota(0, cbArgCount).map!((n) => "__cbArg" ~ n.to!string).array;
+
+	static if (hap == HandleArgumentPos.None)
+		enum cbArgsPadded = cbArgs;
+	else static if (hap == HandleArgumentPos.First)
+		enum cbArgsPadded = ["__handle"] ~ cbArgs;
+	else
+		enum cbArgsPadded = cbArgs ~ ["__handle"];
+
+	// you're only allowed to make declarations in a mixin template, not statements :(
+	void MIXIN_RES()
+	{
+		auto v = mixin("genericBlocker." ~ enumName ~ "Value");
+
+		// for some reason the ide support hates using an IES so I won't
+		enum sEdFuncName = "eventDriver." ~ edName;
+		enum sEdArgs = edArgs.join(",");
+		enum sCbargs = cbArgsPadded.join(",");
+		// assume first argument to event driver is the one we're testing against
+		enum sAssert = (hap == HandleArgumentPos.None ? "" : "assert(__handle==" ~ edArgs[0] ~ ");");
+		enum sReturnVal = extraCons.length ? (extraCons ~ "(" ~ cbArgs.join(",") ~ ")") : cbArgs.join(",");
+
+		mixin(
+			sEdFuncName ~ "(" ~ sEdArgs ~ ", (" ~ sCbargs ~ ") nothrow {"
+				~ sAssert
+				~ "f.blockerResult = BlockerReturn." ~ enumName ~ "(" ~ sReturnVal ~ ");"
+				~ "});"
+		);
 	}
 }
