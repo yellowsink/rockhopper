@@ -42,54 +42,59 @@ struct FEvent
 	}
 }
 
-/+shared class TEvent
-{
+shared class TEvent
+{ // needs to be a class so we can use `synchronized(this)` and `synchronized` members
+
 	import eventcore.core : eventDriver;
 	import eventcore.driver : EventID, EventDriver;
+	import std.typecons : Tuple, tuple;
+	import core.thread.osthread : Thread;
 
-	shared EventID ev;
 	shared bool triggered;
-	// storing a shared(EventDriver) lets us notify() from other threads
-	shared EventDriver sourceDriver;
-	this()
-	{
-		// i'm pretty sure two threads can't construct the *same* class at once so i won't `synchronized` here
-		// you'd have to share a pointer and have two threads try to emplace it at once (?)
-
-		sourceDriver = cast(shared) eventDriver;
-		ev = eventDriver.events.create();
-	}
+	// you may only await an event from the thread that created it, so we need one event per thread
+	shared Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)] threadEvents;
 
 	import std.stdio;
 
 	synchronized void notify()
 	{
 		triggered = true;
-		sourceDriver.events.trigger(ev, true);
+
+		foreach (_, tup; threadEvents)
+			tup[0].events.trigger(tup[1], true);
+
+		threadEvents = typeof(threadEvents).init;
 	}
 
 	synchronized void reset()
 	{
 		if (triggered)
 		{
-			sourceDriver = cast(shared) eventDriver; // we're the new source!
-			ev = eventDriver.events.create();
 			triggered = false;
+			threadEvents = typeof(threadEvents).init;
 		}
 		else
 		{
 			// resetting an event that has not been triggered is a no-op!
+			// assert(0);
 		}
 	}
 
 	void wait()
 	{
 		if (triggered) return;
+
+		auto tid = Thread.getThis.id;
+
+		auto ev = eventDriver.events.create();
+		// TODO: this does not compile?
+		threadEvents[tid] = tuple(cast(shared) eventDriver, ev);
+
 		waitThreadEvent(ev);
 
 		assert(triggered, "if the thread event resolves, triggered should be true!");
 	}
-}+/
+}
 
 // this is like an FEvent however instead of just wrapping a bool, it keeps a count,
 // such that exactly as many wait()s are resolved as notify()s are called.
