@@ -22,11 +22,32 @@ import core.thread.osthread : Thread;
 void main()
 {
 	entrypoint({
-		auto eepyTask = taskify!sleep(dur!"seconds"(5));
-		auto tBefore = MonoTime.currTime;
+		auto ev = new TEvent;
 
-		eepyTask.waitRes(); // void
+		auto thread2 = new Thread({
+			entrypoint({
+				ev.wait();
+				writeln("yay 2!");
+			});
+		}).start();
 
-		writeln("eeped for ", MonoTime.currTime - tBefore);
+		auto thread3 = new Thread({
+			entrypoint({
+				ev.wait();
+				writeln("yay 3!");
+			});
+		}).start();
+
+		auto thread4 = new Thread({
+			entrypoint({
+				writeln("helo");
+				Thread.sleep(dur!"seconds"(2));
+				ev.notify();
+			});
+		}).start();
+
+		thread2.join();
+		thread3.join();
+		thread4.join();
 	});
 }

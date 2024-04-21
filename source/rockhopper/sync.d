@@ -50,9 +50,11 @@ shared class TEvent
 	import std.typecons : Tuple, tuple;
 	import core.thread.osthread : Thread;
 
+	alias ThreadEventsTy = Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)];
+
 	shared bool triggered;
 	// you may only await an event from the thread that created it, so we need one event per thread
-	shared Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)] threadEvents;
+	shared ThreadEventsTy threadEvents;
 
 	import std.stdio;
 
@@ -63,7 +65,7 @@ shared class TEvent
 		foreach (_, tup; threadEvents)
 			tup[0].events.trigger(tup[1], true);
 
-		threadEvents = typeof(threadEvents).init;
+		threadEvents = ThreadEventsTy.init;
 	}
 
 	synchronized void reset()
@@ -71,7 +73,7 @@ shared class TEvent
 		if (triggered)
 		{
 			triggered = false;
-			threadEvents = typeof(threadEvents).init;
+			threadEvents = ThreadEventsTy.init;
 		}
 		else
 		{
@@ -86,9 +88,27 @@ shared class TEvent
 
 		auto tid = Thread.getThis.id;
 
-		auto ev = eventDriver.events.create();
-		// TODO: this does not compile?
-		threadEvents[tid] = tuple(cast(shared) eventDriver, ev);
+		EventID ev = void; // always assigned
+
+		synchronized(this)
+		{
+			// while in a synchronized, you can cast away a `shared`
+			// -- technically you can cast shared away any time, but its safe here :)
+			// use a pointer else this causes a copy and that screws stuff up.
+			// we still have to make sure the contents of the AA are shared due to transititivy,
+			// but this fixes it not liking us trying to do the assignment *at all*
+			auto tEvs = cast(ThreadEventsTy*) &threadEvents;
+
+			if (tid in *tEvs)
+			{
+				ev = (*tEvs)[tid][1];
+			}
+			else
+			{
+				ev = eventDriver.events.create();
+				(*tEvs)[tid] = tuple(cast(shared) eventDriver, ev);
+			}
+		}
 
 		waitThreadEvent(ev);
 
