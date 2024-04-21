@@ -25,6 +25,7 @@ public import eventcore.driver : Process, ProcessID;
 public import eventcore.driver : SignalStatus;
 
 // sockets stuff
+// TODO
 /* import eventcore.driver : StreamSocketFD;
 public import eventcore.driver : ConnectStatus;
 import std.socket : Address;

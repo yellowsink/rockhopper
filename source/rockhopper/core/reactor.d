@@ -206,8 +206,9 @@ private struct Reactor
 			break;
 
 		case sockListen:
-			mixin RegisterCallback!("sockListen", "sockets.listenStream", ["v.bindAddress", "v.opts"], 3, HandleArgumentPos.None, "SRSockListen");
-			MIXIN_RES();
+			assert(0, "listen cannot be awaited within the reactor as its callback returns multiple times");
+			/* mixin RegisterCallback!("sockListen", "sockets.listenStream", ["v.bindAddress", "v.opts"], 3, HandleArgumentPos.None, "SRSockListen");
+			MIXIN_RES(); */
 			break;
 
 		case sockRead:
@@ -229,8 +230,9 @@ private struct Reactor
 			break;
 
 		case sockWaitConns:
-			mixin RegisterCallback!("sockWaitConns", "sockets.waitForConnections", ["v"], 2, HandleArgumentPos.First, "SRSockWaitConns");
-			MIXIN_RES();
+			assert(0, "waitConns cannot be awaited within the reactor as its callback returns multiple times");
+			/* mixin RegisterCallback!("sockWaitConns", "sockets.waitForConnections", ["v"], 2, HandleArgumentPos.First, "SRSockWaitConns");
+			MIXIN_RES(); */
 			break;
 
 		case sockWaitData:
