@@ -1,11 +1,11 @@
 // `sync` contains fiber synchronization primitives.
-// They provide familiar looking sync tools with support for fibers, ~~with optional thread safety~~.
+// They provide familiar looking sync tools with support for fibers, with optional thread safety.
 
 // when thread safety is off, they are designed to be as low overhead and efficient as possible.
 //   (stack allocated structs without locks, etc)
-// ~~when on, they can be shared across many threads' reactors. This has performance and DX side effects.~~
+// when on, they can be shared across many threads' reactors. This has performance and DX side effects.
 
-module rockhopper.sync;
+module rockhopper.rhapi.sync;
 
 import rockhopper.core.reactor : yield, spawn;
 import rockhopper.core.llevents : sleep, waitThreadEvent;

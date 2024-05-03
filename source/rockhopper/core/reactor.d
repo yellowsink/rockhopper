@@ -343,6 +343,7 @@ nothrow @trusted
 	// oops!
 	if (src is null) return null;
 
+	// TODO: does this work for domain sockets? I assume so since EC use it internally?
 	version (Windows)
 		import core.sys.windows.winsock2 : sockaddr_storage, sockaddr;
 	else
