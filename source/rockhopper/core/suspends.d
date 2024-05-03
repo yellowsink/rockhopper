@@ -40,7 +40,7 @@ public
 		FileOpenMode mode;
 	}
 
-	struct SSSockConnect
+	struct SSStreamConnect
 	{
 		import std.socket : Address;
 
@@ -84,7 +84,7 @@ private union _SSRaw
 	SSPipeWrite pipeWrite;
 	ProcessID procWait;
 	int signalTrap;
-	SSSockConnect sockConnect; // TODO: test
+	SSStreamConnect streamConnect;
 	SSSockRead sockRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
 	SSSockReceive sockReceive; // TODO: test
 	SSSockSend sockSend; // TODO: test
@@ -127,7 +127,7 @@ public
 		ulong bytesRWd;
 	}
 
-	struct SRSockConnect
+	struct SRStreamConnect
 	{
 		import eventcore.driver : ConnectStatus;
 
@@ -173,7 +173,7 @@ private union _SRRaw
 	SRRW rw;
 	int procWait;
 	SRSignalTrap signalTrap;
-	SRSockConnect sockConnect;
+	SRStreamConnect streamConnect;
 	SRSockSendReceive sockReceive;
 	SRSockSendReceive sockSend;
 	SRSockWaitConns sockWaitConns;

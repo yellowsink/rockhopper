@@ -200,8 +200,8 @@ private struct Reactor
 			MIXIN_RES();
 			break;
 
-		case sockConnect:
-			mixin RegisterCallback!("sockConnect", "sockets.connectStream", ["v.peerAddress", "v.bindAddress"], 2, HandleArgumentPos.None, "SRSockConnect");
+		case streamConnect:
+			mixin RegisterCallback!("streamConnect", "sockets.connectStream", ["v.peerAddress", "v.bindAddress"], 2, HandleArgumentPos.None, "SRStreamConnect");
 			MIXIN_RES();
 			break;
 
