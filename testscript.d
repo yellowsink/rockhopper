@@ -24,7 +24,11 @@ void main()
 	import std.socket : parseAddress;
 
 	entrypoint({
-		writeln("opening socket");
+
+		auto res = nsLookup("yellows.ink");
+		writeln(res);
+
+		/* writeln("opening socket");
 		LLStreamListen s;
 		s.addr = parseAddress("::1", 8080);
 
@@ -41,6 +45,6 @@ void main()
 
 		s.cleanup();
 
-		writeln("cleaned up!");
+		writeln("cleaned up!"); */
 	});
 }

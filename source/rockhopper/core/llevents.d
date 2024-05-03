@@ -10,7 +10,7 @@ import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
 
 // dns related imports
-//public import eventcore.driver : DNSStatus, RefAddress;
+/* public */ import eventcore.driver : DNSStatus, RefAddress;
 
 // thread event related imports
 import eventcore.driver : EventID;
@@ -43,8 +43,7 @@ struct LLStreamListen
 	import std.socket : Address, UnknownAddress;
 	import std.typecons : Nullable, tuple, Tuple;
 
-	version (Windows) import core.sys.windows.winsock2 : sockaddr_storage, sockaddr;
-	else import core.sys.posix.sys.socket : sockaddr_storage, sockaddr;
+	import rockhopper.core.reactor : cloneRefAddress;
 
 	Address addr;
 	StreamListenOptions opts = StreamListenOptions.defaults;
@@ -57,20 +56,9 @@ struct LLStreamListen
 		assert(fd.isNull);
 
 		fd = eventDriver.sockets.listenStream(addr, opts, (_fd, sfd, ad) nothrow {
-
 			assert(_fd == fd);
 
-			// ad contains pointers to stack variables so we need to copy the actual underlying storage
-			// rockhopper does not care about reducing heap allocations quite as much as eventcore ;)
-			auto heapAllocd = new sockaddr_storage;
-
-			() @trusted { // its @safe i promise ;)
-				*heapAllocd = *(cast(sockaddr_storage*) (ad.name));
-			} ();
-
-			auto ra = new RefAddress(cast(sockaddr*) heapAllocd, ad.nameLen);
-
-			sockets ~= tuple(sfd, ra);
+			sockets ~= tuple(sfd, cloneRefAddress(ad));
 		});
 	}
 
@@ -90,10 +78,10 @@ struct LLStreamListen
 	}
 }
 
-/* SRNsLookup nsLookup(string name)
+SRNsLookup nsLookup(string name)
 {
 	return llawait(SuspendSend.nsLookup(name)).nsLookupValue;
-} */
+}
 
 void waitThreadEvent(EventID evid)
 {

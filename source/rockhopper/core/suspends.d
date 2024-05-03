@@ -73,8 +73,7 @@ private union _SSRaw
 	import eventcore.driver : TimerID, ProcessID, EventID, StreamListenSocketFD;
 	import std.socket : Address;
 
-	// TODO: currently, nsLookup is disabled due to all returned addresses being null
-	//string nsLookup;
+	string nsLookup;
 	EventID threadEvent;
 	SSFileOpen fileOpen;
 	FileFD fileClose;
@@ -102,13 +101,13 @@ public alias SuspendSend = TaggedUnion!_SSRaw;
 
 public
 {
-	/* struct SRNsLookup
+	struct SRNsLookup
 	{
 		import eventcore.driver : DNSStatus, RefAddress;
 
 		DNSStatus status;
 		RefAddress[] addresses;
-	} */
+	}
 
 	struct SRFileOpen
 	{
@@ -166,7 +165,7 @@ private union _SRRaw
 {
 	import eventcore.driver : CloseStatus;
 
-	//SRNsLookup nsLookup;
+	SRNsLookup nsLookup;
 	Void threadEvent;
 	SRFileOpen fileOpen;
 	CloseStatus fileClose;

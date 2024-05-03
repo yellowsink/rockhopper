@@ -146,12 +146,20 @@ private struct Reactor
 
 		final switch (relevantSuspend.kind) with (SuspendSend.Kind)
 		{
-		/* case nsLookup:
-			// the mixin actually cannot handle this case yet - we need to drop an argument
-			// oh well, easy to add later.
-			mixin RegisterCallback!("nsLookup", "dns.lookupHost", ["v"], 3, HandleArgumentPos.None, "SRNsLookup");
-			MIXIN_RES();
-			break; */
+		case nsLookup:
+			// the mixin cannot handle this case due to needing to clone scoped resources
+			auto v = relevantSuspend.nsLookupValue;
+
+			eventDriver.dns.lookupHost(v, (_id, status, scope addrs) nothrow {
+				import std.algorithm : map;
+				import std.array : array;
+				import rockhopper.core.suspends : SuspendReturn, SRNsLookup;
+
+				auto escapedAddrs = addrs.map!(cloneRefAddress).array;
+
+				f.suspendResult = SuspendReturn.nsLookup(SRNsLookup(status, escapedAddrs));
+			});
+			break;
 
 		case threadEvent:
 			mixin RegisterCallback!("threadEvent", "events.wait", ["v"], 0);
@@ -325,4 +333,23 @@ private mixin template RegisterCallback(
 			~ "});"
 		);
 	}
+}
+
+// utility needed for implementation of both DNS and sockets, to help escape refaddresses outside of the scope.
+import eventcore.driver : RefAddress;
+public RefAddress cloneRefAddress(scope RefAddress src)
+nothrow @trusted
+{
+	version (Windows)
+		import core.sys.windows.winsock2 : sockaddr_storage, sockaddr;
+	else
+		import core.sys.posix.sys.socket : sockaddr_storage, sockaddr;
+
+	// heap memory to allow escaping instead of stack memory
+	auto storage = new sockaddr_storage;
+	// copy
+	*storage = *(cast(sockaddr_storage*) src.name);
+
+	// construct new refaddress
+	return new RefAddress(cast(sockaddr*) storage, src.nameLen);
 }
