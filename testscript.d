@@ -26,17 +26,23 @@ void main()
 
 	entrypoint({
 
-		auto socket = eventDriver.sockets.createDatagramSocket(parseAddress("127.0.0.1", 8080), null);
+		writeln("opening socket");
+		StreamListen l;
+		l.addr = parseAddress("::1", 8080);
 
-		writeln(socket);
+		l.register();
+		auto opened = l.wait();
+		writeln("got connection");
+		l.cleanup();
 
-		ubyte[32] buf;
-		auto res = dgramReceive(socket, buf);
+		ubyte[16] buf;
 
-		writeln(res, buf.assumeUTF);
+		auto res = streamRead(opened[0], buf);
 
-		writeln(dgramSend(socket, buf[0 .. res.bytesRWd], res.addr));
+		writeln(res, assumeUTF(buf));
 
-		eventDriver.sockets.releaseRef(socket);
+		writeln(streamWrite(opened[0], buf[0 .. res.bytesRWd]));
+
+		eventDriver.sockets.releaseRef(opened[0]);
 	});
 }

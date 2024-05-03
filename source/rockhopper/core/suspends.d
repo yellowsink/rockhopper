@@ -64,7 +64,7 @@ public
 	alias SSDgramReceive = SSRead!DatagramSocketFD;
 	alias SSFileWrite = SSWrite!FileFD;
 	alias SSPipeWrite = SSWrite!PipeFD;
-	alias SSSockWrite = SSWrite!StreamSocketFD;
+	alias SSStreamWrite = SSWrite!StreamSocketFD;
 }
 
 
@@ -89,8 +89,7 @@ private union _SSRaw
 	SSDgramSend dgramSend;
 	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
 	                                    // TODO: test */
-	StreamSocketFD sockWaitData; // TODO: test
-	SSSockWrite sockWrite; // TODO: wrap this in an fSynchronized! when exposed at a high level // TODO: test
+	SSStreamWrite streamWrite; // TODO: test
 	TimerID sleep;
 	// TODO: directory watchers
 }

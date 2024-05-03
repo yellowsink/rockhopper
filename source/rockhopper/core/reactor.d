@@ -248,13 +248,8 @@ private struct Reactor
 			MIXIN_RES(); */
 			break; +/
 
-		case sockWaitData:
-			mixin RegisterCallback!("sockWaitData", "sockets.waitForData", ["v"], 2, HandleArgumentPos.First, "SRRW", "rw");
-			MIXIN_RES();
-			break;
-
-		case sockWrite:
-			mixin RegisterCallback!("sockWrite", "sockets.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
+		case streamWrite:
+			mixin RegisterCallback!("streamWrite", "sockets.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 

@@ -98,6 +98,12 @@ SRDgramSendReceive dgramSend(DatagramSocketFD fd, ubyte[] buf, Address target, I
 	return llawait(SuspendSend.dgramSend(SSDgramSend(fd, buf, mode, target))).dgramSendReceiveValue;
 }
 
+// TODO: wrap this in an fSynchronized! when exposed at a high level
+SRRW streamWrite(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+{
+	return llawait(SuspendSend.streamWrite(SSStreamWrite(fd, 0, buf, mode))).rwValue;
+}
+
 SRNsLookup nsLookup(string name)
 {
 	return llawait(SuspendSend.nsLookup(name)).nsLookupValue;
