@@ -28,10 +28,22 @@ private
 		const(ubyte)[] buf;
 		IOMode ioMode;
 	}
+}
+
+public
+{
+	struct SSFileOpen
+	{
+		import eventcore.driver : FileOpenMode;
+
+		string path;
+		FileOpenMode mode;
+	}
 
 	struct SSSockConnect
 	{
 		import std.socket : Address;
+
 		Address peerAddress;
 		Address bindAddress;
 	}
@@ -41,7 +53,8 @@ private
 		import std.socket : Address;
 		import eventcore.driver : StreamListenOptions;
 
-		/* scope */ Address bindAddress;
+		/* scope */
+		Address bindAddress;
 		StreamListenOptions opts;
 	}
 
@@ -53,17 +66,6 @@ private
 		const(ubyte)[] buf;
 		IOMode ioMode;
 		Address targetAddress;
-	}
-}
-
-public
-{
-	struct SSFileOpen
-	{
-		import eventcore.driver : FileOpenMode;
-
-		string path;
-		FileOpenMode mode;
 	}
 
 	alias SSFileRead = SSRead!FileFD;

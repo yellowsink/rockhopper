@@ -22,32 +22,11 @@ import core.thread.osthread : Thread;
 void main()
 {
 	entrypoint({
-		auto ev = new TEvent;
+		// explode time
 
-		auto thread2 = new Thread({
-			entrypoint({
-				ev.wait();
-				writeln("yay 2!");
-			});
-		}).start();
+		import std.socket : parseAddress;
 
-		auto thread3 = new Thread({
-			entrypoint({
-				ev.wait();
-				writeln("yay 3!");
-			});
-		}).start();
-
-		auto thread4 = new Thread({
-			entrypoint({
-				writeln("helo");
-				Thread.sleep(dur!"seconds"(2));
-				ev.notify();
-			});
-		}).start();
-
-		thread2.join();
-		thread3.join();
-		thread4.join();
+		auto res = sockConnect(parseAddress("107.189.3.111"), parseAddress("0.0.0.0"));
+		writeln(res);
 	});
 }

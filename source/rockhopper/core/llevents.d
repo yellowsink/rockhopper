@@ -25,15 +25,14 @@ public import eventcore.driver : Process, ProcessID;
 public import eventcore.driver : SignalStatus;
 
 // sockets stuff
-// TODO
-/* import eventcore.driver : StreamSocketFD;
-public import eventcore.driver : ConnectStatus;
+import eventcore.driver : StreamSocketFD;
+//public import eventcore.driver : ConnectStatus;
 import std.socket : Address;
 
-ConnectStatus sockConnect(Address peer, Address bind)
+SRSockConnect sockConnect(Address peer, Address bind)
 {
 	return llawait(SuspendSend.sockConnect(SSSockConnect(peer, bind))).sockConnectValue;
-} */
+}
 
 // sleep imports
 import std.datetime : Duration, dur;
