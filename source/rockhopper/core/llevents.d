@@ -51,7 +51,7 @@ struct StreamListen
 
 	Tuple!(StreamSocketFD, RefAddress)[] sockets;
 
-	void register()
+	void registerListen()
 	{
 		assert(fd.isNull);
 
@@ -60,6 +60,19 @@ struct StreamListen
 
 			sockets ~= tuple(sfd, cloneRefAddress(ad));
 		});
+	}
+
+	// uses waitForConnections instead of listenStream, required you bring your own fd, ignores this.addr and this.opts.
+	void registerWaitConns(StreamListenSocketFD listenfd)
+	{
+		assert(fd.isNull);
+		fd = listenfd;
+
+		eventDriver.sockets.waitForConnections(listenfd, (_fd, sfd, ad) nothrow {
+			assert(_fd == fd);
+
+			sockets ~= tuple(sfd, cloneRefAddress(ad));
+		})
 	}
 
 	void cleanup()

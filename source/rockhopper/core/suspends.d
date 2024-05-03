@@ -87,11 +87,9 @@ private union _SSRaw
 	SSStreamRead streamRead;
 	SSDgramReceive dgramReceive;
 	SSDgramSend dgramSend;
-	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
-	                                    // TODO: test */
-	SSStreamWrite streamWrite; // TODO: test
+	SSStreamWrite streamWrite;
 	TimerID sleep;
-	// TODO: directory watchers
+	// not implemented: directory watchers
 }
 
 public alias SuspendSend = TaggedUnion!_SSRaw;
@@ -143,14 +141,6 @@ public
 		RefAddress addr;
 	}
 
-	struct SRSockWaitConns
-	{
-		import eventcore.driver : RefAddress;
-
-		StreamSocketFD fd;
-		RefAddress addr;
-	}
-
 	struct SRSignalTrap
 	{
 		import eventcore.driver : SignalListenID, SignalStatus;
@@ -173,7 +163,6 @@ private union _SRRaw
 	SRSignalTrap signalTrap;
 	SRStreamConnect streamConnect;
 	SRDgramSendReceive dgramSendReceive;
-	SRSockWaitConns sockWaitConns;
 	Void sleep;
 }
 

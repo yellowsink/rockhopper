@@ -242,12 +242,6 @@ private struct Reactor
 			});
 			break;
 
-		/+ case sockWaitConns:
-			assert(0, "waitConns cannot be awaited within the reactor as its callback returns multiple times");
-			/* mixin RegisterCallback!("sockWaitConns", "sockets.waitForConnections", ["v"], 2, HandleArgumentPos.First, "SRSockWaitConns");
-			MIXIN_RES(); */
-			break; +/
-
 		case streamWrite:
 			mixin RegisterCallback!("streamWrite", "sockets.write", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
@@ -346,6 +340,9 @@ import eventcore.driver : RefAddress;
 public RefAddress cloneRefAddress(scope RefAddress src)
 nothrow @trusted
 {
+	// oops!
+	if (src is null) return null;
+
 	version (Windows)
 		import core.sys.windows.winsock2 : sockaddr_storage, sockaddr;
 	else
