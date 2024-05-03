@@ -24,27 +24,24 @@ void main()
 	import std.socket : parseAddress;
 
 	entrypoint({
+		writeln("opening socket");
+		StreamListen l;
+		l.addr = parseAddress("::1", 8080);
 
-		auto res = nsLookup("yellows.ink");
-		writeln(res);
+		l.register();
+		auto opened = l.wait();
+		writeln("got connection");
+		l.cleanup();
 
-		/* writeln("opening socket");
-		LLStreamListen s;
-		s.addr = parseAddress("::1", 8080);
+		import std.string : assumeUTF;
 
-		s.register();
+		ubyte[16] buf;
 
-		spawn({
-			while (true)
-			{
-				writeln(s.wait()[1]);
-			}
-		});
+		auto res = streamRead(opened[0], buf);
 
-		sleep(dur!"seconds"(10));
+		writeln(res, assumeUTF(buf));
 
-		s.cleanup();
+		eventDriver.sockets.releaseRef(opened[0]);
 
-		writeln("cleaned up!"); */
 	});
 }

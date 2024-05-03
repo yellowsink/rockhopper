@@ -213,8 +213,8 @@ private struct Reactor
 			MIXIN_RES();
 			break;
 
-		case sockRead:
-			mixin RegisterCallback!("sockRead", "sockets.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
+		case streamRead:
+			mixin RegisterCallback!("streamRead", "sockets.read", ["v.fd", "v.buf", "v.ioMode"], 2, HandleArgumentPos.First, "SRRW", "rw");
 			MIXIN_RES();
 			break;
 

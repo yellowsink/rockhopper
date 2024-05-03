@@ -60,7 +60,7 @@ public
 
 	alias SSFileRead = SSRead!FileFD;
 	alias SSPipeRead = SSRead!PipeFD;
-	alias SSSockRead = SSRead!StreamSocketFD;
+	alias SSStreamRead = SSRead!StreamSocketFD;
 	alias SSSockReceive = SSRead!DatagramSocketFD;
 	alias SSFileWrite = SSWrite!FileFD;
 	alias SSPipeWrite = SSWrite!PipeFD;
@@ -84,7 +84,7 @@ private union _SSRaw
 	ProcessID procWait;
 	int signalTrap;
 	SSStreamConnect streamConnect;
-	SSSockRead sockRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
+	SSStreamRead streamRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
 	SSSockReceive sockReceive; // TODO: test
 	SSSockSend sockSend; // TODO: test
 	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?

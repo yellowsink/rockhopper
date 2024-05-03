@@ -38,7 +38,7 @@ SRStreamConnect streamConnect(Address peer, Address bind)
 	return llawait(SuspendSend.streamConnect(SSStreamConnect(peer, bind))).streamConnectValue;
 }
 
-struct LLStreamListen
+struct StreamListen
 {
 	import std.socket : Address, UnknownAddress;
 	import std.typecons : Nullable, tuple, Tuple;
@@ -76,6 +76,11 @@ struct LLStreamListen
 		sockets = sockets[1 .. $];
 		return s;
 	}
+}
+
+SRRW streamRead(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+{
+	return llawait(SuspendSend.streamRead(SSStreamRead(fd, 0, buf, mode))).rwValue;
 }
 
 SRNsLookup nsLookup(string name)
