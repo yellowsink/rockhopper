@@ -48,11 +48,11 @@ public
 		Address bindAddress;
 	}
 
-	struct SSSockSend
+	struct SSDgramSend
 	{
 		import std.socket : Address;
 
-		DatagramSocketFD sock;
+		DatagramSocketFD fd;
 		const(ubyte)[] buf;
 		IOMode ioMode;
 		Address targetAddress;
@@ -86,7 +86,7 @@ private union _SSRaw
 	SSStreamConnect streamConnect;
 	SSStreamRead streamRead;
 	SSDgramReceive dgramReceive;
-	SSSockSend sockSend; // TODO: test
+	SSDgramSend dgramSend;
 	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
 	                                    // TODO: test */
 	StreamSocketFD sockWaitData; // TODO: test
@@ -173,8 +173,7 @@ private union _SRRaw
 	int procWait;
 	SRSignalTrap signalTrap;
 	SRStreamConnect streamConnect;
-	SRDgramSendReceive dgramReceive;
-	SRDgramSendReceive sockSend;
+	SRDgramSendReceive dgramSendReceive;
 	SRSockWaitConns sockWaitConns;
 	Void sleep;
 }

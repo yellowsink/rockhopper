@@ -90,7 +90,12 @@ IOStatus streamWaitForData(StreamSocketFD fd)
 
 SRDgramSendReceive dgramReceive(DatagramSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
 {
-	return llawait(SuspendSend.dgramReceive(SSDgramReceive(fd, 0, buf, mode))).dgramReceiveValue;
+	return llawait(SuspendSend.dgramReceive(SSDgramReceive(fd, 0, buf, mode))).dgramSendReceiveValue;
+}
+
+SRDgramSendReceive dgramSend(DatagramSocketFD fd, ubyte[] buf, Address target, IOMode mode = IOMode.once)
+{
+	return llawait(SuspendSend.dgramSend(SSDgramSend(fd, buf, mode, target))).dgramSendReceiveValue;
 }
 
 SRNsLookup nsLookup(string name)

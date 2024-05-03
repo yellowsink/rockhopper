@@ -35,6 +35,8 @@ void main()
 
 		writeln(res, buf.assumeUTF);
 
+		writeln(dgramSend(socket, buf[0 .. res.bytesRWd], res.addr));
+
 		eventDriver.sockets.releaseRef(socket);
 	});
 }

@@ -225,14 +225,21 @@ private struct Reactor
 			eventDriver.sockets.receive(v.fd, v.buf, v.ioMode, (_fd, status, read, scope addr) nothrow{
 				import rockhopper.core.suspends : SuspendReturn, SRDgramSendReceive;
 
-				f.suspendResult = SuspendReturn.dgramReceive(SRDgramSendReceive(status, read, cloneRefAddress(addr)));
+				f.suspendResult = SuspendReturn.dgramSendReceive(SRDgramSendReceive(status, read, cloneRefAddress(addr)));
 			});
 			break;
 
-		case sockSend:
-			// assert(0, "not yet working"); // scope RefAddress
-			mixin RegisterCallback!("sockSend", "sockets.send", ["v.sock", "v.buf", "v.ioMode", "v.targetAddress"], 3, HandleArgumentPos.First, "SRDgramSendReceive");
-			MIXIN_RES();
+		case dgramSend:
+			// cannot use the mixin due to a refaddress that needs cloning
+			auto v = relevantSuspend.dgramSendValue;
+
+			eventDriver.sockets.send(v.fd, v.buf, v.ioMode, v.targetAddress, (_fd, status, written, scope addr) nothrow{
+				import rockhopper.core.suspends : SuspendReturn, SRDgramSendReceive;
+
+				assert(addr is null);
+
+				f.suspendResult = SuspendReturn.dgramSendReceive(SRDgramSendReceive(status, written, null));
+			});
 			break;
 
 		/+ case sockWaitConns:
