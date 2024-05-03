@@ -22,26 +22,19 @@ import core.thread.osthread : Thread;
 void main()
 {
 	import std.socket : parseAddress;
+	import std.string : assumeUTF;
 
 	entrypoint({
-		writeln("opening socket");
-		StreamListen l;
-		l.addr = parseAddress("::1", 8080);
 
-		l.register();
-		auto opened = l.wait();
-		writeln("got connection");
-		l.cleanup();
+		auto socket = eventDriver.sockets.createDatagramSocket(parseAddress("127.0.0.1", 8080), null);
 
-		import std.string : assumeUTF;
+		writeln(socket);
 
-		ubyte[16] buf;
+		ubyte[32] buf;
+		auto res = dgramReceive(socket, buf);
 
-		auto res = streamRead(opened[0], buf);
+		writeln(res, buf.assumeUTF);
 
-		writeln(res, assumeUTF(buf));
-
-		eventDriver.sockets.releaseRef(opened[0]);
-
+		eventDriver.sockets.releaseRef(socket);
 	});
 }

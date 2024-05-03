@@ -26,7 +26,7 @@ import eventcore.driver : IOMode, FileFD, PipeFD;
 /* public */ import eventcore.driver : SignalStatus;
 
 // socket related imports
-import eventcore.driver : StreamSocketFD, StreamListenSocketFD;
+import eventcore.driver : StreamSocketFD, StreamListenSocketFD, DatagramSocketFD;
 /* public */ import eventcore.driver : ConnectStatus, StreamListenOptions, RefAddress;
 import std.socket : Address;
 
@@ -81,6 +81,16 @@ struct StreamListen
 SRRW streamRead(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
 {
 	return llawait(SuspendSend.streamRead(SSStreamRead(fd, 0, buf, mode))).rwValue;
+}
+
+IOStatus streamWaitForData(StreamSocketFD fd)
+{
+	return streamRead(fd, []).status;
+}
+
+SRDgramSendReceive dgramReceive(DatagramSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+{
+	return llawait(SuspendSend.dgramReceive(SSDgramReceive(fd, 0, buf, mode))).dgramReceiveValue;
 }
 
 SRNsLookup nsLookup(string name)

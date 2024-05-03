@@ -61,7 +61,7 @@ public
 	alias SSFileRead = SSRead!FileFD;
 	alias SSPipeRead = SSRead!PipeFD;
 	alias SSStreamRead = SSRead!StreamSocketFD;
-	alias SSSockReceive = SSRead!DatagramSocketFD;
+	alias SSDgramReceive = SSRead!DatagramSocketFD;
 	alias SSFileWrite = SSWrite!FileFD;
 	alias SSPipeWrite = SSWrite!PipeFD;
 	alias SSSockWrite = SSWrite!StreamSocketFD;
@@ -84,8 +84,8 @@ private union _SSRaw
 	ProcessID procWait;
 	int signalTrap;
 	SSStreamConnect streamConnect;
-	SSStreamRead streamRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
-	SSSockReceive sockReceive; // TODO: test
+	SSStreamRead streamRead;
+	SSDgramReceive dgramReceive;
 	SSSockSend sockSend; // TODO: test
 	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
 	                                    // TODO: test */
@@ -134,14 +134,14 @@ public
 		ConnectStatus status;
 	}
 
-	struct SRSockSendReceive
+	struct SRDgramSendReceive
 	{
 		import eventcore.driver : IOStatus, RefAddress;
 
 		IOStatus status;
 		// 0 if error
 		ulong bytesRWd;
-		/* scope */ RefAddress addr;
+		RefAddress addr;
 	}
 
 	struct SRSockWaitConns
@@ -173,8 +173,8 @@ private union _SRRaw
 	int procWait;
 	SRSignalTrap signalTrap;
 	SRStreamConnect streamConnect;
-	SRSockSendReceive sockReceive;
-	SRSockSendReceive sockSend;
+	SRDgramSendReceive dgramReceive;
+	SRDgramSendReceive sockSend;
 	SRSockWaitConns sockWaitConns;
 	Void sleep;
 }
