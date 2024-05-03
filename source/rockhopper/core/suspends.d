@@ -48,16 +48,6 @@ public
 		Address bindAddress;
 	}
 
-	struct SSSockListen
-	{
-		import std.socket : Address;
-		import eventcore.driver : StreamListenOptions;
-
-		/* scope */
-		Address bindAddress;
-		StreamListenOptions opts;
-	}
-
 	struct SSSockSend
 	{
 		import std.socket : Address;
@@ -95,13 +85,11 @@ private union _SSRaw
 	ProcessID procWait;
 	int signalTrap;
 	SSSockConnect sockConnect; // TODO: test
-	SSSockListen sockListen; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
-	                         // TODO: test
 	SSSockRead sockRead; // can be used to wait for data if iomode.{once,all} and buf.length==0 // TODO: test
 	SSSockReceive sockReceive; // TODO: test
 	SSSockSend sockSend; // TODO: test
-	StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
-	                                    // TODO: test
+	/* StreamListenSocketFD sockWaitConns; // TODO: cannot be awaited - remove this from suspends entirely and handle in llevents?
+	                                    // TODO: test */
 	StreamSocketFD sockWaitData; // TODO: test
 	SSSockWrite sockWrite; // TODO: wrap this in an fSynchronized! when exposed at a high level // TODO: test
 	TimerID sleep;
@@ -157,15 +145,6 @@ public
 		/* scope */ RefAddress addr;
 	}
 
-	struct SRSockListen
-	{
-		import eventcore.driver : StreamListenSocketFD, RefAddress;
-
-		StreamListenSocketFD listenFd;
-		StreamSocketFD sockFd;
-		RefAddress addr;
-	}
-
 	struct SRSockWaitConns
 	{
 		import eventcore.driver : RefAddress;
@@ -195,7 +174,6 @@ private union _SRRaw
 	int procWait;
 	SRSignalTrap signalTrap;
 	SRSockConnect sockConnect;
-	SRSockListen sockListen;
 	SRSockSendReceive sockReceive;
 	SRSockSendReceive sockSend;
 	SRSockWaitConns sockWaitConns;

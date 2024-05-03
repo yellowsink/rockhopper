@@ -21,12 +21,26 @@ import core.thread.osthread : Thread;
 
 void main()
 {
+	import std.socket : parseAddress;
+
 	entrypoint({
-		// explode time
+		writeln("opening socket");
+		LLStreamListen s;
+		s.addr = parseAddress("::1", 8080);
 
-		import std.socket : parseAddress;
+		s.register();
 
-		auto res = sockConnect(parseAddress("107.189.3.111"), parseAddress("0.0.0.0"));
-		writeln(res);
+		spawn({
+			while (true)
+			{
+				writeln(s.wait()[1]);
+			}
+		});
+
+		sleep(dur!"seconds"(10));
+
+		s.cleanup();
+
+		writeln("cleaned up!");
 	});
 }

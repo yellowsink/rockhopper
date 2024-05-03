@@ -3,7 +3,8 @@
 module rockhopper.core.llevents;
 
 // general imports
-import rockhopper.core.reactor : llawait;
+import rockhopper.core.reactor : llawait, yield;
+// yield should only be used for the socket wrappers, all others should use llawait only
 import rockhopper.core.suspends;
 import eventcore.core : eventDriver;
 import std.typecons : Tuple, tuple;
@@ -16,22 +17,74 @@ import eventcore.driver : EventID;
 
 // file/pipe related imports
 import eventcore.driver : IOMode, FileFD, PipeFD;
-public import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus;
+/* public */ import eventcore.driver : FileOpenMode, OpenStatus, CloseStatus, IOStatus;
 
 // process related imports
-public import eventcore.driver : Process, ProcessID;
+/* public */ import eventcore.driver : Process, ProcessID;
 
 // signal related imports
-public import eventcore.driver : SignalStatus;
+/* public */ import eventcore.driver : SignalStatus;
 
 // sockets stuff
-import eventcore.driver : StreamSocketFD;
-//public import eventcore.driver : ConnectStatus;
+import eventcore.driver : StreamSocketFD, StreamListenSocketFD;
+/* public */ import eventcore.driver : ConnectStatus, StreamListenOptions, RefAddress;
 import std.socket : Address;
 
-SRSockConnect sockConnect(Address peer, Address bind)
+SRSockConnect streamConnect(Address peer, Address bind)
 {
 	return llawait(SuspendSend.sockConnect(SSSockConnect(peer, bind))).sockConnectValue;
+}
+
+struct LLStreamListen
+{
+	import std.socket : Address, UnknownAddress;
+	import std.typecons : Nullable, tuple, Tuple;
+
+	version (Windows) import core.sys.windows.winsock2 : sockaddr_storage, sockaddr;
+	else import core.sys.posix.sys.socket : sockaddr_storage, sockaddr;
+
+	Address addr;
+	StreamListenOptions opts = StreamListenOptions.defaults;
+	Nullable!StreamListenSocketFD fd;
+
+	Tuple!(StreamSocketFD, RefAddress)[] sockets;
+
+	void register()
+	{
+		assert(fd.isNull);
+
+		fd = eventDriver.sockets.listenStream(addr, opts, (_fd, sfd, ad) nothrow {
+
+			assert(_fd == fd);
+
+			// ad contains pointers to stack variables so we need to copy the actual underlying storage
+			// rockhopper does not care about reducing heap allocations quite as much as eventcore ;)
+			auto heapAllocd = new sockaddr_storage;
+
+			() @trusted { // its @safe i promise ;)
+				*heapAllocd = *(cast(sockaddr_storage*) (ad.name));
+			} ();
+
+			auto ra = new RefAddress(cast(sockaddr*) heapAllocd, ad.nameLen);
+
+			sockets ~= tuple(sfd, ra);
+		});
+	}
+
+	void cleanup()
+	{
+		assert(!fd.isNull);
+		eventDriver.sockets.releaseRef(fd.get);
+	}
+
+	Tuple!(StreamSocketFD, RefAddress) wait()
+	{
+		while (sockets is null || !sockets.length) yield();
+
+		auto s = sockets[0];
+		sockets = sockets[1 .. $];
+		return s;
+	}
 }
 
 // sleep imports
