@@ -53,7 +53,7 @@ You can trigger this event from any thread by casting `eventDriver` to `shared`,
 ### Example
 
 ```d
-shared sdriver = eventDriver;
+shared sdriver = cast(shared) eventDriver;
 auto ev = eventDriver.events.create();
 
 new Thread({
@@ -97,10 +97,6 @@ SRRW fileRead(FileFD, ulong oset, ubyte[], IOMode = IOMode.once) [ASYNC] [SINGUL
 
 Reads bytes from the file, starting at the given byte offset, into the buffer.
 If you try to read past the end of the file, `bytesRWd` will be zero and an error will be returned.
-
-Only a SINGLE read operation on each file is allowed at once.
-One must return before the next can start.
-This is not enforced
 
 [corresponding eventcore documentation](https://vibed.org/api/eventcore.driver/EventDriverFiles.read)
 
