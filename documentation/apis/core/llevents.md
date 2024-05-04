@@ -269,13 +269,13 @@ struct StreamListen
 	Address addr;
 	StreamListenOptions opts;
 	Nullable!StreamListenSocketFD fd;
-	Tuple(StreamSocketFD, RefAddress)[] sockets;
+	Tuple!(StreamSocketFD, RefAddress)[] sockets;
 
-	void registerListen()
-	void registerWaitConns()
-	void cleanup()
+	void registerListen();
+	void registerWaitConns();
+	void cleanup();
 
-	Tuple!(StreamSocketFD, RefAddress) wait() [ASYNC]
+	Tuple!(StreamSocketFD, RefAddress) wait(); [ASYNC]
 }
 ```
 

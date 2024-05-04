@@ -26,21 +26,21 @@ void main()
 	import eventcore.driver : FileOpenMode;
 
 	entrypoint({
-		import std.socket : parseAddress;
-		import std.string : representation; // string to bytes
+		// create a task
+		auto t = tSpawn({ writeln("1"); sleep(dur!"msecs"(500)); writeln("3"); return "hello there"; });
 
-		StreamListen listener;
-		listener.addr = parseAddress("::1", 8080);
-		listener.registerListen();
+		writeln("2");
 
-		// say hi to 3 people who connect to us
-		for (auto i = 0; i < 3; i++)
-		{
-			auto stream = listener.wait();
+		auto t2 = t.then((string s) { writeln(s); });
 
-			spawn({ streamWrite(stream[0], representation("hey there!")); eventDriver.sockets.releaseRef(stream[0]); });
-		}
+		t2.waitRes(); // wait for task to finish
+		assert(t.isFinished);
 
-		listener.cleanup();
+		// bonus: create a task using an async function
+		import rockhopper.core.llevents : nsLookup;
+
+		auto dnsTask = taskify!nsLookup("google.com");
+
+		writeln(dnsTask.waitRes);
 	});
 }
