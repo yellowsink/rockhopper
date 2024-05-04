@@ -9,6 +9,7 @@ the outcome of a suspend.
 These are all understood natively by the reactor, and all have user friendly wrappers in `llevents`.
 
 This page will not describe each kind of suspend in full detail, as that is done on the `llevents` page.
+It instead serves more as an API reference.
 
 ## `SuspendSend`
 
@@ -57,60 +58,157 @@ TaggedUnion!(union
 This is a `TaggedUnion` representing any possible suspend return.
 Note that some of these are re-used to correspond to multiple sends, especially `rw`.
 
-## DNS lookup
+## Suspend list
+
+| Suspend          | Send            | Return             | `llevents` Wrapper | Description                                                              |
+| ---------------- | --------------- | ------------------ | ------------------ | ------------------------------------------------------------------------ |
+| DNS Lookup       | `nsLookup`      | `nsLookup`         | `nsLookup`         | Performs a DNS lookup on the given host and returns the resulting IPs    |
+| Thread Event     | `threadEvent`   | `threadEvent`      | `waitThreadEvent`  | Waits for a thread event created on the current thread to be triggered   |
+| File Open        | `fileOpen`      | `fileOpen`         | `fileOpen`         | Opens a file with the given mode                                         |
+| File Close       | `fileClose`     | `fileClose`        | `fileClose`        | Closes a file descriptor                                                 |
+| File Read        | `fileRead`      | `rw`               | `fileRead`         | Reads a file at a given offset into a given buffer                       |
+| Pipe Read        | `pipeRead`      | `rw`               | `pipeRead`         | Reads from a pipe into a given buffer                                    |
+| File Write       | `fileWrite`     | `rw`               | `fileWrite`        | Writes the buffer at the given offset to the file                        |
+| Pipe Write       | `pipeWrite`     | `rw`               | `pipeWrite`        | Writes the buffer into the pipe                                          |
+| Process Wait     | `procWait`      | `procWait`         | `processWait`      | Waits for a process to close                                             |
+| Signal Trap      | `signalTrap`    | `signalTrap`       | `signalTrap`       | Listens for a POSIX signal (you MUST immediately `releaseRef` on the id) |
+| Stream Connect   | `streamConnect` | `streamConnect`    | `streamConnect`    | Opens a TCP connection to the given socket                               |
+| Stream Read      | `streamRead`    | `rw`               | `streamRead`       | Reads from a TCP stream                                                  |
+| Stream Write     | `streamWrite`   | `rw`               | `streamWrite`      | Writes to a TCP stream                                                   |
+| Datagram Receive | `dgramReceive`  | `dgramSendReceive` | `dgramReceive`     | Receives a datagram from a UDP socket                                    |
+| Datagram Send    | `dgramSend`     | `dgramSendReceive` | `dgramSend`        | Sends a datagram to a UDP socket                                         |
+| Sleep            | `sleep`         | `sleep`            | `sleep`            | Waits for a one-shot timer to fire                                       |
+
+## `SSRead(FD)`
+
+The family of types used for reading follow the pattern:
 
 ```d
-// send
-string nsLookup
-
-// return
-SRNsLookup nsLookup
-
-struct SRNsLookup { DNSStatus status; RefAddress[] addresses; }
+struct SSRead(FD)
+{
+	FD fd; // fd type depends on resource type
+	ulong offset; // only used for files but here always nonetheless
+	ubyte[] buf;
+	IOMode ioMode;
+}
 ```
 
-`llevents` wrapper: `nsLookup`
+| Struct Name      | FD Type            |
+| ---------------- | ------------------ |
+| `SSFileRead`     | `FileFD`           |
+| `SSPipeRead`     | `PipeFD`           |
+| `SSStreamRead`   | `StreamSocketFD`   |
+| `SSDgramReceive` | `DatagramSocketFD` |
 
-Performs a DNS lookup on the given host and returns the resulting IPs.
+## `SSWrite(FD)`
 
-## Thread Events
+The family of types used for writing follow the pattern:
 
 ```d
-// send
-EventID threadEvent
-
-// return
-Void threadEvent
+struct SSWrite(FD)
+{
+	FD fd; // fd type depends on resource type
+	ulong offset; // only used for files but here always nonetheless
+	const(ubyte)[] buf;
+	IOMode ioMode;
+}
 ```
 
-`llevents` wrapper: `waitThreadEvent`
+| Struct Name     | FD Type          |
+| --------------- | ---------------- |
+| `SSFileWrite`   | `FileFD`         |
+| `SSPipeWrite`   | `PipeFD`         |
+| `SSStreamWrite` | `StreamSocketFD` |
 
-Waits for a thread event created on the current thread.
+## `SSFileOpen`
 
-## File Open
+```d
+struct SSFileOpen
+{
+	string path;
+	FileOpenMode mode;
+}
+```
 
-## File Close
+## `SSStreamConnect`
 
-## File Read
+```d
+struct SSStreamConnect
+{
+	Address peerAddress;
+	Address bindAddress;
+}
+```
 
-## Pipe Read
+## `SSDgramSend`
 
-## File Write
+```d
+struct SSDgramSend
+{
+	DatagramSocketFD fd;
+	const(ubyte)[] buf;
+	IOMode ioMode;
+	Address targetAddress;
+}
+```
 
-## Pipe Write
+## `SRNsLookup`
 
-## Process Wait
+```d
+struct SRNsLookup
+{
+	DNSStatus status;
+	RefAddress[] addresses;
+}
+```
 
-## Signal Trap
+## `SRFileOpen`
 
-## Stream Connect
+```d
+struct SRFileOpen
+{
+	FileFd fd;
+	OpenStatus status;
+}
+```
 
-## Stream Read
+## `SRRW`
 
-## Stream Write
+```d
+struct SRRW
+{
+	IOStatus status;
+	ulong bytesRWd;
+}
+```
 
-## Datagram Receive
+## `SRStreamConnect`
 
-## Datagram Send
+```d
+struct SRStreamConnect
+{
+	StreamSocketFD fd;
+	ConnectStatus status;
+}
+```
 
-## Sleep
+## `SRDgramSendReceive`
+
+```d
+struct SRDgramSendReceive
+{
+	IOStatus status;
+	ulong bytesRWd;
+	RefAddress addr;
+}
+```
+
+## `SRSignalTrap`
+
+```d
+struct SRSignalTrap
+{
+	SignalListenID slID;
+	SignalStatus status;
+}
+```
