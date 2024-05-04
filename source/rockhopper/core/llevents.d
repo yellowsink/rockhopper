@@ -2,6 +2,8 @@
 //            does not cover all operations, as some things can be done synchronously from `eventDriver`.
 module rockhopper.core.llevents;
 
+// TODO: when all of these are wrapped at a high level, check the docs for which need fSynchronized!
+
 // general imports
 import rockhopper.core.reactor : llawait, yield;
 // yield should only be used for the socket wrappers, all others should use llawait only
@@ -72,7 +74,7 @@ struct StreamListen
 			assert(_fd == fd);
 
 			sockets ~= tuple(sfd, cloneRefAddress(ad));
-		})
+		});
 	}
 
 	void cleanup()
@@ -106,13 +108,12 @@ SRDgramSendReceive dgramReceive(DatagramSocketFD fd, ubyte[] buf, IOMode mode = 
 	return llawait(SuspendSend.dgramReceive(SSDgramReceive(fd, 0, buf, mode))).dgramSendReceiveValue;
 }
 
-SRDgramSendReceive dgramSend(DatagramSocketFD fd, ubyte[] buf, Address target, IOMode mode = IOMode.once)
+SRDgramSendReceive dgramSend(DatagramSocketFD fd, const(ubyte)[] buf, Address target, IOMode mode = IOMode.once)
 {
 	return llawait(SuspendSend.dgramSend(SSDgramSend(fd, buf, mode, target))).dgramSendReceiveValue;
 }
 
-// TODO: wrap this in an fSynchronized! when exposed at a high level
-SRRW streamWrite(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+SRRW streamWrite(StreamSocketFD fd, const(ubyte)[] buf, IOMode mode = IOMode.once)
 {
 	return llawait(SuspendSend.streamWrite(SSStreamWrite(fd, 0, buf, mode))).rwValue;
 }
@@ -132,6 +133,9 @@ SRFileOpen fileOpen(string path, FileOpenMode mode)
 	return llawait(SuspendSend.fileOpen(SSFileOpen(path, mode))).fileOpenValue;
 }
 
+// this always returns instantly, btw
+// https://github.com/vibe-d/eventcore/blob/515edf9b7ebf47d08b0cec8a7a5ae2cced30be71/source/eventcore/drivers/threadedfile.d#L250
+// therefore it doesn't *really* need to go via the reactor, but oh well. Plus releaseref works too.
 CloseStatus fileClose(FileFD fd)
 {
 	return llawait(SuspendSend.fileClose(fd)).fileCloseValue;

@@ -1,9 +1,9 @@
 // `task` provides a very minimal task implementation on top of fibers.
 
-module rockhopper.task;
+module rockhopper.rhapi.task;
 
 import rockhopper.core.reactor : spawn; // used in constructor and in then
-import rockhopper.sync : FEvent; // used for syncing the fibers
+import rockhopper.rhapi.sync : FEvent; // used for syncing the fibers
 
 import std.typecons : Nullable; // used by tryGetRes
 
