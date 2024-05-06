@@ -17,14 +17,16 @@ struct FEvent
 	// this does not have reference semantics so purposefully prevent footgunning, use a FEvent* if you need it.
 	@disable this(ref FEvent);
 
-	bool isSignaled;
+	private bool raised;
 
-	void notify() { isSignaled = true; }
-	void reset() { isSignaled = false; }
+	bool isSignaled() inout @property { return raised; }
+
+	void notify() { raised = true; }
+	void reset() { raised = false; }
 
 	void wait()
 	{
-		while (!isSignaled) yield();
+		while (!raised) yield();
 	}
 
 	bool wait(Duration timeout)
@@ -35,8 +37,8 @@ struct FEvent
 			timedOut = true;
 		});
 
-		while (!isSignaled && !timedOut) yield();
-		return isSignaled;
+		while (!raised && !timedOut) yield();
+		return raised;
 	}
 }
 
@@ -48,7 +50,7 @@ struct FSemaphore
 {
 	@disable this(ref FSemaphore); // see FEvent::this(ref FEvent)
 
-	uint count;
+	private uint count;
 
 	void notify() { count++; }
 
@@ -89,9 +91,9 @@ struct FMutex
 {
 	@disable this(ref FMutex); // see FEvent::this(ref FEvent)
 
-	Fiber lockHolder; // null-safety: will be null iff lockcount == 0.
+	private Fiber lockHolder; // null-safety: will be null iff lockcount == 0.
+	private uint lockcount;
 
-	uint lockcount;
 	void lock()
 	{
 		auto thisF = Fiber.getThis;
@@ -130,8 +132,8 @@ struct FRWMutex
 {
 	@disable this(ref FRWMutex); // see FEvent::this(ref FEvent)
 
-	bool writeLocked;
-	uint readLocks; // writeLocked => readLocks = 0 (in the mathematical sense of =>)
+	private bool writeLocked;
+	private uint readLocks; // writeLocked => readLocks = 0 (in the mathematical sense of =>)
 
 	void lockWrite()
 	{
@@ -204,10 +206,12 @@ template fSynchronized(alias func)
 // TODO: there has to be a better name for this surely
 struct FGuardedResult(T)
 {
+	import std.typecons : Nullable;
+
 	@disable this(ref FGuardedResult); // see FEvent::this(ref FEvent)
 
 	bool hasValue;
-	T value;
+	private T value;
 
 	void set(T val)
 	{
@@ -225,6 +229,12 @@ struct FGuardedResult(T)
 		while (!hasValue) yield();
 		return value;
 	}
+
+	Nullable!T tryGet()
+	{
+		if (hasValue) return value;
+		else return Nullable!T.init;
+	}
 }
 
 // like a golang WaitGroup
@@ -236,7 +246,7 @@ struct FWaitGroup
 {
 	@disable this(ref FWaitGroup); // see FEvent::this(ref FEvent)
 
-	uint count;
+	private uint count;
 
 	void add(uint amt)
 	{

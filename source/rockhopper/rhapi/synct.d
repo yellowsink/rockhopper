@@ -20,11 +20,9 @@ shared class TEvent
 
 	alias ThreadEventsTy = Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)];
 
-	shared bool triggered;
+	private shared bool triggered;
 	// you may only await an event from the thread that created it, so we need one event per thread
-	shared ThreadEventsTy threadEvents;
-
-	import std.stdio;
+	private shared ThreadEventsTy threadEvents;
 
 	synchronized void notify()
 	{
@@ -94,11 +92,6 @@ shared class TSemaphore
 
 	private shared uint count;
 	private shared TEvent notifyEv = new TEvent;
-
-	/* this()
-	{
-		notifyEv = new TEvent;
-	} */
 
 	synchronized void notify()
 	{
