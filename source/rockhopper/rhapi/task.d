@@ -18,6 +18,9 @@ struct Task(T)
 	static if(VALUED)
 		private T res;
 
+	// disable copying struct
+	@disable this(ref Task);
+
 	// may only call this with T function() or T delegate()
 	// we use a separate function to wrap this so we can infer the type T from F.
 	private this(F)(F dg)
@@ -31,6 +34,15 @@ struct Task(T)
 				dg();
 			ev.notify();
 		});
+	}
+
+	static if(VALUED)
+	{
+		private this(T value)
+		{
+			res = value;
+			ev.notify(); // this is so jank lmao
+		}
 	}
 
 	bool isFinished() inout @property
@@ -84,4 +96,64 @@ if (isSomeFunction!F && Parameters!F.length == 0)
 auto taskify(alias F)(Parameters!F params)
 {
 	return tSpawn({ return F(params); });
+}
+
+auto completedTask(T)(T value)
+{
+	return Task!T(value);
+}
+
+void waitAllTasks(T)(Task!T*[] tasks)
+{
+	foreach (t; tasks) t.waitRes(); // lol
+}
+
+// heterogenous version
+void waitAllTasks(TASKS...)()
+{
+	import std.traits : isInstanceOf;
+
+	static foreach(t; TASKS)
+	{
+		static assert(isInstanceOf!(Task, typeof(t)), "Cannot pass a value to waitAllTasks that is not a Task");
+
+		t.waitRes(); // lol it really is that shrimple
+	}
+}
+
+void waitAnyTask(T)(Task!T*[] tasks)
+{
+	FEvent ev;
+
+	foreach (t; tasks)
+		static if (is(T == void))
+			t.then({ ev.notify(); });
+		else
+			t.then((T _) { ev.notify(); });
+
+	ev.wait();
+}
+
+// heterogenous
+void waitAnyTask(TASKS...)()
+{
+	import std.traits : isInstanceOf, TemplateArgsOf;
+
+	FEvent ev;
+
+	static foreach(t; TASKS)
+	{{
+		alias TTask = typeof(t);
+
+		static assert(isInstanceOf!(Task, TTask), "Cannot pass a value to waitAnyTask that is not a Task");
+
+		alias TValue = TemplateArgsOf!TTask[0];
+
+		static if (is(TValue == void))
+			t.then({ ev.notify(); });
+		else
+			t.then((TValue _) { ev.notify(); });
+	}}
+
+	ev.wait();
 }

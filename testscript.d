@@ -20,33 +20,15 @@ import core.thread.osthread : Thread;
 
 void main()
 {
-	shared sem = new TSemaphore;
-
-	auto thread1 = new Thread({
-		entrypoint({
-			for (auto i = 0; i < 2; i++)
-			{
-				sem.wait();
-				writeln("thread 1 wait");
-			}
-		});
-	}).start();
-
-	auto thread2 = new Thread({
-		entrypoint({
-			sem.wait();
-			writeln("thread 2 wait");
-		});
-	}).start();
-
 	entrypoint({
-		for (auto i = 0; i < 3; i++)
-		{
-			sleep(dur!"seconds"(1));
-			sem.notify();
-		}
-	});
 
-	thread1.join();
-	thread2.join();
+		auto t1 = tSpawn({ sleep(dur!"msecs"(500)); return 5; });
+
+		auto t2 = completedTask("yo");
+
+		auto t3 = completedTask(3);
+
+		waitAnyTask!(t1, t2);
+
+	});
 }
