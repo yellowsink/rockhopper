@@ -3,7 +3,7 @@
 module rockhopper.rhapi.task;
 
 import rockhopper.core.reactor : spawn; // used in constructor and in then
-import rockhopper.rhapi.sync : FEvent; // used for syncing the fibers
+import rockhopper.rhapi.syncf : FEvent; // used for syncing the fibers
 
 import std.typecons : Nullable; // used by tryGetRes
 

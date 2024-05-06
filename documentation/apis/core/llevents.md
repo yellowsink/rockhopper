@@ -12,7 +12,7 @@ Any APIs marked as "singular" may only have ONE call in flight at once per resou
 For example: if I write to a file, nobody else may write to that file until I've finished.
 
 `llevents` does not enforce this for you, but you should have measures in place to prevent it.
-(hint: `rhapi.sync.fSynchronized`)
+(hint: `rhapi.syncf.fSynchronized`)
 
 This is per-resource (generally the one that has a file descriptor), not globally.
 
