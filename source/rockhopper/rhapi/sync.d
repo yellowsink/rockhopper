@@ -398,3 +398,39 @@ struct FWaitGroup
 		while (count > 0) yield();
 	}
 }
+
+// kinda like a channel in Go
+struct FMessageBox(T)
+{
+	import std.container : DList;
+	import std.typecons : Nullable;
+
+
+	@disable this(ref FMessageBox); // see FEvent::this(ref FEvent)
+
+	private DList!T queue;
+
+	void send(T val, bool shouldYield = true)
+	{
+		queue.insertBack(val);
+
+		// probably most sensible to do this?
+		if (shouldYield) yield();
+	}
+
+	T receive()
+	{
+		while (queue.empty) yield();
+
+		auto front = queue.front;
+		queue.removeFront();
+		return front;
+	}
+
+	Nullable!T tryReceive()
+	{
+		if (queue.empty) return Nullable!T.init;
+
+		return receive();
+	}
+}
