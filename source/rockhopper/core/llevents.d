@@ -47,7 +47,7 @@ struct StreamListen
 
 	import rockhopper.core.reactor : cloneRefAddress;
 
-	@disable this(ref FMessageBox); // prevent implicit copying
+	@disable this(ref StreamListen); // prevent implicit copying
 
 	Address addr;
 	StreamListenOptions opts = StreamListenOptions.defaults;

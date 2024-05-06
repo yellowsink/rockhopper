@@ -60,6 +60,8 @@ shared class TEvent
 
 	synchronized void notify()
 	{
+		if (triggered) return; // i don't think this is necessary but can't hurt.
+
 		triggered = true;
 
 		foreach (_, tup; threadEvents)
@@ -84,35 +86,36 @@ shared class TEvent
 
 	void wait()
 	{
-		if (triggered) return;
-
 		auto tid = Thread.getThis.id;
 
-		EventID ev = void; // always assigned
-
-		synchronized(this)
+		while (!triggered)
 		{
-			// while in a synchronized, you can cast away a `shared`
-			// -- technically you can cast shared away any time, but its safe here :)
-			// use a pointer else this causes a copy and that screws stuff up.
-			// we still have to make sure the contents of the AA are shared due to transititivy,
-			// but this fixes it not liking us trying to do the assignment *at all*
-			auto tEvs = cast(ThreadEventsTy*) &threadEvents;
+			EventID ev = void; // always assigned
 
-			if (tid in *tEvs)
+			synchronized(this)
 			{
-				ev = (*tEvs)[tid][1];
+				// while in a synchronized, you can cast away a `shared`
+				// -- technically you can cast shared away any time, but its safe here :)
+				// use a pointer else this causes a copy and that screws stuff up.
+				// we still have to make sure the contents of the AA are shared due to transititivy,
+				// but this fixes it not liking us trying to do the assignment *at all*
+				auto tEvs = cast(ThreadEventsTy*) &threadEvents;
+
+				if (tid in *tEvs)
+				{
+					ev = (*tEvs)[tid][1];
+				}
+				else
+				{
+					ev = eventDriver.events.create();
+					(*tEvs)[tid] = tuple(cast(shared) eventDriver, ev);
+				}
 			}
-			else
-			{
-				ev = eventDriver.events.create();
-				(*tEvs)[tid] = tuple(cast(shared) eventDriver, ev);
-			}
+
+			waitThreadEvent(ev);
+			// if the thread event resolves, triggered may still be false because another fiber got there before us,
+			// and reset the event. to prevent this case, we loop around again.
 		}
-
-		waitThreadEvent(ev);
-
-		assert(triggered, "if the thread event resolves, triggered should be true!");
 	}
 }
 
@@ -158,71 +161,69 @@ struct FSemaphore
 }
 
 // thread safe FSemaphore
-// TODO: work in progress, untested and probably not correct
-/+class TSemaphore
+shared class TSemaphore
 {
-	shared uint count;
+	import core.atomic : atomicOp;
 
-	void notify()
+	private shared uint count;
+	private shared TEvent notifyEv;
+
+	this()
+	{
+		notifyEv = new TEvent;
+	}
+
+	synchronized void notify()
 	{
 		atomicOp!"+="(count, 1);
+
+		// notify this event when a new notify is sent
+		// and reset it after each wait.
+		notifyEv.notify();
 	}
 
 	synchronized bool tryWait()
 	{
-		if (count == 0)
-			return false;
+		if (count == 0) return false;
+
 		atomicOp!"-="(count, 1);
+		notifyEv.reset(); // in case nobody else is waiting, reset it ready for next time
 		return true;
 	}
 
 	void wait()
 	{
-		while(1)
+		// check if we can go immediately
+		synchronized(this)
 		{
-			auto done = false;
+			if (count > 0)
+			{
+				notifyEv.reset(); // must have been triggered, likely not cleared up.
+
+				atomicOp!"-="(count, 1);
+				return;
+			}
+		}
+
+		// no? okay, wait for the event, then see if we can decrement, if not try again.
+		while (true)
+		{
+			notifyEv.wait();
+			notifyEv.reset(); // reset the lock for next time. should be safe to do this lock-free.
+
 			synchronized(this)
 			{
 				if (count > 0)
 				{
-					atomicOp!"+="(count, 1);
-					done = true;
+					atomicOp!"-="(count, 1);
+					return;
 				}
 			}
-
-			if (done) break;
-			yield();
+			// count was not greater than zero, so someone else got here first!
+			// we let go of the lock and get back to waiting.
 		}
 	}
-
-	bool wait(Duration timeout)
-	{
-		bool timedOut;
-		spawn({
-			sleep(timeout);
-			timedOut = true;
-		});
-
-		while (!timedOut)
-		{
-			auto done = false;
-			synchronized (this)
-			{
-				if (count > 0)
-				{
-					atomicOp!"+="(count, 1);
-					done = true;
-				}
-			}
-
-			if (done)
-				break;
-			yield();
-		}
-
-		return !timedOut;
-	}
-}+/
+}
 
 // core.sync.mutex : Mutex
 // this is a recursive mutex - the SAME FIBER ONLY can call lock() multiple times without deadlocking
