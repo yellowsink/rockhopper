@@ -43,6 +43,12 @@ for a notification from the OS, suspending the thread.
 
 You can expect your fiber to be called again later, and execution will resume after yield() returns.
 
+A common pattern is to call yield in a loop until a condition is true, and this generally works quite well, but you
+should be careful when doing this - only do it when waiting on something that ultimately depends on some kind of OS
+event (think `llevents` apis and `rhapi` functions that are doing I/O etc), as if all of your fibers are all yield
+looping, then the reactor will end up busy-waiting and your program will sit at 100% cpu use, which is obviously
+non-ideal.
+
 ## `earlyExit`
 
 ```d
