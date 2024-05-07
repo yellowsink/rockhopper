@@ -49,11 +49,22 @@ Spawns a task that runs the given function as a fiber, and completes when it ret
 ## `taskify(F)`
 
 ```d
-auto taskify(alias F)(Parameters!F)
+Task!(ReturnType!F) taskify(alias F)(Parameters!F)
 ```
 
 `taskify` is a template that helps you more easily use async APIs in task-oriented code.
 It wraps a function to run inside a task.
+
+## `tSpawnAsThread`
+
+```d
+R tSpawnAsThread(R delegate());
+R tSpawnAsThread(R function());
+```
+
+Spawns a task that runs the given function on a newly spawned thread, then passes the result back to your thread.
+
+The task this creates should be used with the *calling thread's* reactor, not the spawned thread's reactor.
 
 ## Example
 

@@ -33,15 +33,13 @@ ThreadHandle spawnThread(void delegate() fn)
 	shared(EventDriver) res;
 
 	auto t = new Thread({
-		entrypoint({
-			// send over a shared reference to this driver
-			res = cast(shared) eventDriver;
-			// tell the other thread that that's done
-			sd.events.trigger(ev, true);
+		// send over a shared reference to this driver
+		res = cast(shared) eventDriver;
+		// tell the other thread that that's done
+		sd.events.trigger(ev, true);
 
-			// run the fiber!
-			fn();
-		});
+		// run the fiber!
+		entrypoint(fn);
 	}).start();
 
 	assert(t !is null);
