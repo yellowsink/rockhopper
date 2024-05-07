@@ -157,3 +157,27 @@ void waitAnyTask(TASKS...)()
 
 	ev.wait();
 }
+
+// like tSpawn but runs on another thread. The returned task is for use on *this* thread.
+auto tSpawnAsThread(F)(F fn)
+if (isSomeFunction!F && Parameters!F.length == 0)
+{
+	import rockhopper.core.threading : spawnThread;
+
+	alias T = ReturnType!F;
+
+	return tSpawn({
+		static if (!is(T == void))
+			shared ReturnType!F res;
+
+		spawnThread({
+			static if (is(T == void))
+				tSpawn(fn).waitRes();
+			else
+				res = tSpawn(fn).waitRes();
+		}).join();
+
+		static if (!is(T == void))
+			return res;
+	});
+}

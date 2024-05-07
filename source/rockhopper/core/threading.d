@@ -15,7 +15,7 @@ struct ThreadHandle
 	Thread th;
 	shared(EventDriver) ed;
 
-	void joinThread() { joinThread(th); }
+	void join() { joinThread(th); }
 
 	void spawn(void delegate() fn)
 	{

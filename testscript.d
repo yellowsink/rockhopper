@@ -22,25 +22,16 @@ void main()
 {
 	entrypoint({
 
-		shared sem = new TSemaphore;
+		writeln("thread id: ", Thread.getThis.id);
 
-		auto thread1 = spawnThread({
-			writeln("hi from thread 1");
+		tSpawnAsThread({
+			writeln("thread id: ", Thread.getThis.id);
+		}).waitRes();
 
-			sleep(dur!"msecs"(500));
-			sem.notify();
-		});
-
-		auto thread2 = spawnThread({
-			writeln("hi from thread 2");
-		});
-
-		joinThread(thread2);
-		writeln("main thread: joined 2");
-
-		sem.wait();
-		writeln("main thread: 2 notified sem");
-		joinThread(thread1);
+		tSpawnAsThread({
+			writeln("thread id: ", Thread.getThis.id);
+			return 5;
+		}).waitRes().writeln;
 
 	});
 }
