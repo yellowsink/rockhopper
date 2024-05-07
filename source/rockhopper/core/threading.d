@@ -14,6 +14,14 @@ struct ThreadHandle
 {
 	Thread th;
 	shared(EventDriver) ed;
+
+	void joinThread() { joinThread(th); }
+
+	void spawn(void delegate() fn)
+	{
+		assert(th.isRunning, "cannot spawn in a thread that is finished");
+		spawnInThread(ed, fn);
+	}
 }
 
 // spawns a new thread and runs the given function as a fiber in that thread's reactor
@@ -45,7 +53,7 @@ ThreadHandle spawnThread(void delegate() fn)
 	return ThreadHandle(t, res);
 }
 
-private void _runInThread_springboard(void delegate() f) @trusted nothrow
+private void _spawnInThread_springboard(void delegate() f) @trusted nothrow
 {
 	try
 	{
@@ -57,7 +65,7 @@ private void _runInThread_springboard(void delegate() f) @trusted nothrow
 		{
 			import std.stdio : stderr;
 
-			stderr.writeln("[rockhopper.core.threading.runInThread] failed to spawn fiber in remote thread: ", e);
+			stderr.writeln("[rockhopper.core.threading.spawnInThread] failed to spawn fiber in remote thread: ", e);
 		}
 		catch (Exception)
 		{
@@ -71,13 +79,7 @@ private void _runInThread_springboard(void delegate() f) @trusted nothrow
 // REQUIRES that that thread's event loop is already running! if `entrypoint` has exited, this won't work.
 void spawnInThread(shared(EventDriver) ed, void delegate() fn)
 {
-	ed.core.runInOwnerThread(&_runInThread_springboard, fn);
-}
-
-void spawnInThread(ThreadHandle th, void delegate() fn)
-{
-	assert(th.th.isRunning, "cannot spawn in a thread that is finished");
-	spawnInThread(th.ed, fn);
+	ed.core.runInOwnerThread(&_spawnInThread_springboard, fn);
 }
 
 // waits for a thread to exit asynchronously
@@ -97,5 +99,3 @@ void joinThread(Thread th)
 	waitThreadEvent(ev);
 	t.join();
 }
-
-void joinThread(ThreadHandle th) { joinThread(th.th); }
