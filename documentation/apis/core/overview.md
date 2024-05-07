@@ -3,7 +3,7 @@
 The `core` APIs are the most fundamental in Rockhopper. They are prone to mistakes if misused, and are not complete -
 that is, they generally contain only operations that are async, and leave out synchronous but relevant operations.
 
-There are three parts that make these APIs up:
+There are four parts that make these APIs up:
 
 The Rockhopper `reactor` is the most important part of Rockhopper.
 You have one reactor per thread, which is responsible for scheduling your fibers - that is, when you `yield()`, control
@@ -22,3 +22,6 @@ It generally serves two jobs:
  - An implementation detail - these are the types passed to the reactor to tell it what your fiber is waiting for,
    and what the reactor will give you back when it's done.
  - Return types - `llevents` will often return structs from here back to you.
+
+`threading` has tools for managing threads. It is unlikely that your app will need threads, but if it does, these are
+the tools to use to manage them.

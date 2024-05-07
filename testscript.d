@@ -22,13 +22,25 @@ void main()
 {
 	entrypoint({
 
-		auto t1 = tSpawn({ sleep(dur!"msecs"(500)); return 5; });
+		shared sem = new TSemaphore;
 
-		auto t2 = completedTask("yo");
+		auto thread1 = spawnThread({
+			writeln("hi from thread 1");
 
-		auto t3 = completedTask(3);
+			sleep(dur!"msecs"(500));
+			sem.notify();
+		});
 
-		waitAnyTask!(t1, t2);
+		auto thread2 = spawnThread({
+			writeln("hi from thread 2");
+		});
+
+		joinThread(thread2);
+		writeln("main thread: joined 2");
+
+		sem.wait();
+		writeln("main thread: 2 notified sem");
+		joinThread(thread1);
 
 	});
 }
