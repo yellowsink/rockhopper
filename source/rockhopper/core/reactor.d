@@ -76,12 +76,13 @@ private struct Reactor
 	// if this is ever a problem, reintroduce the old class lazy init thing but with a Reactor* instead.
 	@disable this(ref Reactor);
 
-	Nullable!WrappedFiber _currentFiber;
+	Nullable!(WrappedFiber*) _currentFiber;
 
-	WrappedFiber[] fibers;
+	WrappedFiber*[] fibers;
 
 	void enqueueFiber(void delegate() f)
 	{
+		// It would be nice to not do heap allocation here?
 		fibers ~= new WrappedFiber(f);
 	}
 
@@ -133,7 +134,7 @@ private struct Reactor
 		}
 	}
 
-	private void registerCallbackIfNeeded(WrappedFiber f)
+	private void registerCallbackIfNeeded(WrappedFiber* f)
 	{
 		import eventcore.core : eventDriver;
 
@@ -254,9 +255,11 @@ private struct Reactor
 		}
 	}
 
-	// TODO: struct? maybe? perhaps...? to think about for later.
-	final class WrappedFiber
+	struct WrappedFiber
 	{
+		// if this is copied, the state can desync. let's stop that from happening at all.
+		@disable this(ref WrappedFiber);
+
 		this(void delegate() fn)
 		{
 			fiber = new Fiber(fn);
@@ -335,6 +338,7 @@ private mixin template RegisterCallback(
 	}
 }
 
+// TODO: this function is kinda homeless :(
 // utility needed for implementation of both DNS and sockets, to help escape refaddresses outside of the scope.
 import eventcore.driver : RefAddress;
 public RefAddress cloneRefAddress(scope RefAddress src)
