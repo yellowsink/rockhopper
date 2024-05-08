@@ -10,9 +10,8 @@ import core.atomic : atomicOp;
 
 // These need to be classes so we can use `synchronized(this)` and `synchronized` members
 
-shared class TEvent
+final shared class TEvent
 {
-
 	import eventcore.core : eventDriver;
 	import eventcore.driver : EventID, EventDriver;
 	import std.typecons : Tuple, tuple;
@@ -20,9 +19,9 @@ shared class TEvent
 
 	alias ThreadEventsTy = Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)];
 
-	private shared bool triggered;
+	private bool triggered;
 	// you may only await an event from the thread that created it, so we need one event per thread
-	private shared ThreadEventsTy threadEvents;
+	private ThreadEventsTy threadEvents;
 
 	synchronized void notify()
 	{
@@ -86,12 +85,12 @@ shared class TEvent
 	}
 }
 
-shared class TSemaphore
+final shared class TSemaphore
 {
 	import core.atomic : atomicOp;
 
-	private shared uint count;
-	private shared TEvent notifyEv = new TEvent;
+	private uint count;
+	private TEvent notifyEv = new TEvent;
 
 	synchronized void notify()
 	{

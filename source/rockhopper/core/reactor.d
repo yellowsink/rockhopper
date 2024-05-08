@@ -255,7 +255,7 @@ private struct Reactor
 	}
 
 	// TODO: struct? maybe? perhaps...? to think about for later.
-	class WrappedFiber
+	final class WrappedFiber
 	{
 		this(void delegate() fn)
 		{
