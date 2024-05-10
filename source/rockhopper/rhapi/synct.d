@@ -87,14 +87,15 @@ final shared class TEvent
 
 final shared class TSemaphore
 {
-	import core.atomic : atomicOp;
-
-	private uint count;
+	// we always access this inside of a `synchronized` so atomics are unnecessary
+	// __gshared disables the compiler enforcement for that
+	// MAKE SURE YOU NEVER USE THIS OUTSIDE OF A `synchronized(this)` OR `synchronized` METHOD
+	private __gshared uint count;
 	private TEvent notifyEv = new TEvent;
 
 	synchronized void notify()
 	{
-		atomicOp!"+="(count, 1);
+		count++;
 
 		// notify this event when a new notify is sent
 		// and reset it after each wait.
@@ -106,7 +107,7 @@ final shared class TSemaphore
 		if (count == 0)
 			return false;
 
-		atomicOp!"-="(count, 1);
+		count--;
 		notifyEv.reset(); // in case nobody else is waiting, reset it ready for next time
 		return true;
 	}
@@ -120,7 +121,7 @@ final shared class TSemaphore
 			{
 				notifyEv.reset(); // must have been triggered, likely not cleared up.
 
-				atomicOp!"-="(count, 1);
+				count--;
 				return;
 			}
 		}
@@ -135,7 +136,7 @@ final shared class TSemaphore
 			{
 				if (count > 0)
 				{
-					atomicOp!"-="(count, 1);
+					count--;
 					return;
 				}
 			}
