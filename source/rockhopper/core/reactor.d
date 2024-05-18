@@ -5,6 +5,29 @@ module rockhopper.core.reactor;
 import core.thread.fiber : Fiber;
 import rockhopper.core.suspends : SuspendSend, SuspendReturn;
 
+public __gshared int allocations;
+public __gshared int bytesAllocd;
+
+public template new_(T)
+{
+	import std.traits : isImplicitlyConvertible;
+	static if (isImplicitlyConvertible!(T, Object))
+		alias Ret = T;
+	else
+		alias Ret = T*;
+
+	Ret new_(Args...)(Args a)
+	{
+		allocations++;
+		static if(isImplicitlyConvertible!(T, Object))
+			bytesAllocd += __traits(classInstanceSize, T);
+		else
+			bytesAllocd += T.sizeof;
+		return new T(a);
+	}
+}
+
+
 public {
 	void spawn(void delegate() fn)
 	{
@@ -83,11 +106,17 @@ private struct Reactor
 	void enqueueFiber(void delegate() f)
 	{
 		// It would be nice to not do heap allocation here?
-		fibers ~= new WrappedFiber(f);
+		fibers ~= new_!(WrappedFiber)(f);
 	}
 
 	void loop()
 	{
+import core.thread.fiber : Fiber;
+		import std.stdio : writeln;
+
+		writeln("WrappedFiber.sizeof = ", WrappedFiber.sizeof);
+		writeln("Fiber.sizeof        = ", __traits(classInstanceSize, Fiber));
+
 		import eventcore.core : eventDriver;
 		import eventcore.driver : ExitReason;
 		import std.array : array;
@@ -262,7 +291,7 @@ private struct Reactor
 
 		this(void delegate() fn)
 		{
-			fiber = new Fiber(fn);
+			fiber = new_!(Fiber)(fn);
 		}
 
 		Fiber fiber;

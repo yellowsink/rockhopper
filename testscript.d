@@ -20,18 +20,29 @@ import core.thread.osthread : Thread;
 
 void main()
 {
+	enum AMOUNT = 100_000;
+
+	writeln("spawning ", AMOUNT, " co-existent fibers on one reactor...");
+
+	MonoTime before;
+	MonoTime spawned;
+	MonoTime exited;
+
 	entrypoint({
+		// yes, these fibers all immediately die, yes thats fine, they don't get a chance to run and hence die until
+		// this one yields anyway.
 
-		writeln("thread id: ", Thread.getThis.id);
+		before = MonoTime.currTime;
 
-		tSpawnAsThread({
-			writeln("thread id: ", Thread.getThis.id);
-		}).waitRes();
+		for (auto i = 0; i < AMOUNT; i++)
+			spawn({});
 
-		tSpawnAsThread({
-			writeln("thread id: ", Thread.getThis.id);
-			return 5;
-		}).waitRes().writeln;
-
+		spawned = MonoTime.currTime;
 	});
+
+	exited = MonoTime.currTime;
+
+	writeln("time to spawn:        ", spawned - before);
+	writeln("time to exit reactor: ", exited - before);
+	writeln("allocated ", allocations, " times, for ", bytesAllocd, " bytes");
 }
