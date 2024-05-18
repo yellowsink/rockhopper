@@ -111,12 +111,6 @@ private struct Reactor
 
 	void loop()
 	{
-import core.thread.fiber : Fiber;
-		import std.stdio : writeln;
-
-		writeln("WrappedFiber.sizeof = ", WrappedFiber.sizeof);
-		writeln("Fiber.sizeof        = ", __traits(classInstanceSize, Fiber));
-
 		import eventcore.core : eventDriver;
 		import eventcore.driver : ExitReason;
 		import std.array : array;
@@ -303,6 +297,28 @@ import core.thread.fiber : Fiber;
 		Nullable!SuspendReturn suspendResult;
 	}
 }
+
+// === ALLOCATOR ===
+
+/* import std.experimental.allocator : make;
+import std.experimental.allocator.building_blocks;
+
+// MagicMemoryMachine can magically produce memory from the OS somehow! awesome!!!
+alias MagicMemoryMachine = StatsCollector!(GCAllocator, Options.num, Options.num);
+
+// whenever someone deallocates a WrappedFiber, hold onto the memory
+alias WrapFFList = FreeList!(MagicMemoryMachine, Reactor.WrappedFiber.sizeof);
+// whenever someone deallocates aa Fiber, hold onto the memory
+alias FiberFlist = FreeList!(MagicMemoryMachine, __traits(classInstanceSize, Fiber));
+
+alias Allocator = Segregator!(
+	Reactor.WrappedFiber.sizeof, WrapFFList,
+	Segregator!(
+		__traits(classInstanceSize, Fiber),
+		FiberFlist,
+		MagicMemoryMachine
+	)
+); */
 
 // === MIXIN FOR NEATER REGISTERING OF CALLBACKS ===
 

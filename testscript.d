@@ -46,3 +46,29 @@ void main()
 	writeln("time to exit reactor: ", exited - before);
 	writeln("allocated ", allocations, " times, for ", bytesAllocd, " bytes");
 }
+
+/*
+
+void main()
+{
+	enum BATCH = 1000;
+	enum COUNT = 100_000;
+
+	writeln("spawning ", BATCH, " co-existent fibers on one reactor ", COUNT, " times in a row ...");
+
+	entrypoint({
+		for (auto j = 0; j < COUNT; j++)
+		{
+			for (auto i = 0; i < BATCH; i++)
+				spawn({});
+
+			// yield a few times to let all the others die.
+			// idk how many i need but this should do lol
+			for (auto h = 0; h < 10; h++) yield();
+		}
+	});
+
+	writeln("created ", allocations, " objects, using ", bytesAllocd, " bytes");
+}
+
+ */
