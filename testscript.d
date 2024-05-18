@@ -63,11 +63,11 @@ void main()
 	for (auto c = 0; c < COUNT; c++)
 	{
 		// allocate
-		auto fibs = allocateWrappedFibers(BATCH);
+		//auto fibs = allocateWrappedFibers(BATCH);
 
 		// deallocate
-		foreach (f; fibs)
-			rfree(f);
+		//foreach (f; fibs)
+			//rfree(f);
 	}
 
 	writeln("time: ", MonoTime.currTime - before);

@@ -91,7 +91,6 @@ private struct Reactor
 		import eventcore.core : eventDriver;
 		import eventcore.driver : ExitReason;
 		import std.array : array;
-		import std.algorithm : map, filter;
 		import std.datetime : Duration;
 
 		while (fibers.length)
@@ -300,72 +299,39 @@ private struct Reactor
 }
 
 // === ALLOCATOR ===
-
-import std.experimental.allocator : unbounded;
-import std.experimental.allocator.building_blocks;
-import std.algorithm.comparison : max;
-
-// MagicMemoryMachine can magically produce memory from the OS somehow! awesome!!!
-alias MagicMemoryMachine = Mallocator;
-alias Batched = AllocatorList!((n) => Region!MagicMemoryMachine(max(10 * 1024 * 1024, n)));
-
-alias FL = FreeList!(Batched, 0, unbounded);
-
-alias Allocator =
-	Segregator!(
-		Reactor.WrappedFiber.sizeof,
-		FL,
-		FL
-	);
-
-/* private */ public {
+private {
+	import std.experimental.allocator : unbounded;
+	import std.experimental.allocator.building_blocks;
+	import std.algorithm.comparison : max;
 	import std.experimental.allocator : make, dispose;
+
+	alias Batched = AllocatorList!((n) => Region!Mallocator(max(1024 * 1024, n)));
+
+	alias FL = FreeList!(Batched, 0, unbounded);
+
+	alias Allocator =
+		Segregator!(
+			Reactor.WrappedFiber.sizeof,
+			FL,
+			FL
+		);
 
 	Allocator _rallocator;
 
 	auto ralloc(T, A...)(auto ref A a)
 	{
-		import core.memory : GC;
-		//return make!T(_rallocator, a);
-		//return new T(a);
-		static if (is(T == class))
-		{
-			// we don't initialize classes because initializing Fiber is slow asf
-			//return cast(T) GC.calloc(__traits(classInstanceSize, T));
-			return cast(T) _rallocator.allocate(__traits(classInstanceSize, T)).ptr;
-		}
-		else
-		{
-			//return cast(T*) GC.calloc(T.sizeof);
-			return cast(T*) _rallocator.allocate(T.sizeof).ptr;
-			//return new T;
-		}
+		return make!T(_rallocator, a);
 	}
 
 	void rfree(T)(auto ref T* p)
 	{
-		//dispose(_rallocator, p);
-		import core.memory : GC;
-		//GC.free(cast(void*) p);
-		_rallocator.deallocate((cast(void*) p)[0 .. T.sizeof]);
+		dispose(_rallocator, p);
 	}
 
 	void rfree(T)(auto ref T p)
 	if (is(T == class) || is(T == interface))
 	{
-		//dispose(_rallocator, p);
-		import core.memory : GC;
-		//GC.free(cast(void*) p);
-		_rallocator.deallocate((cast(void*) p)[0 .. __traits(classInstanceSize, T)]);
-	}
-
-	auto allocateWrappedFibers(int n)
-	{
-		auto fibers = new Reactor.WrappedFiber*[n];
-		for (auto i = 0; i < n; i++)
-			fibers[i] = ralloc!(Reactor.WrappedFiber)(cast(void delegate()) {});
-
-		return fibers;
+		dispose(_rallocator, p);
 	}
 }
 
