@@ -143,6 +143,14 @@ private struct Reactor
 			//           .outOfWaiters -> no fibers have registered suspends (e.g. yield() without a suspend)
 			//           .timeout -> impossible, lol
 		}
+
+		if (fibers.length)
+		{
+			foreach (f; fibers)
+				rfree(f);
+
+			fibers = [];
+		}
 	}
 
 	private void registerCallbackIfNeeded(WrappedFiber* f)
@@ -293,29 +301,22 @@ private struct Reactor
 
 // === ALLOCATOR ===
 
+import std.experimental.allocator : unbounded;
 import std.experimental.allocator.building_blocks;
+import std.algorithm.comparison : max;
 
 // MagicMemoryMachine can magically produce memory from the OS somehow! awesome!!!
-alias MagicMemoryMachine = GCAllocator; //StatsCollector!(GCAllocator, Options.numAll, Options.numAll);
+alias MagicMemoryMachine = Mallocator;
+alias Batched = AllocatorList!((n) => Region!MagicMemoryMachine(max(10 * 1024 * 1024, n)));
 
-// whenever someone deallocates a WrappedFiber, hold onto the memory
-alias WrapFFList = FreeList!(MagicMemoryMachine, Reactor.WrappedFiber.sizeof);
-// whenever someone deallocates aa Fiber, hold onto the memory
-alias FiberFlist = FreeList!(MagicMemoryMachine, __traits(classInstanceSize, Fiber));
+alias FL = FreeList!(Batched, 0, unbounded);
 
-alias Allocator = StatsCollector!(
-		/* Segregator!(
-		Reactor.WrappedFiber.sizeof, WrapFFList,
-		Segregator!(
-			__traits(classInstanceSize, Fiber),
-			FiberFlist,
-			MagicMemoryMachine
-		)
-	), */
-	MagicMemoryMachine,
-	Options.all,
-	Options.all
-);
+alias Allocator =
+	Segregator!(
+		Reactor.WrappedFiber.sizeof,
+		FL,
+		FL
+	);
 
 /* private */ public {
 	import std.experimental.allocator : make, dispose;
@@ -324,31 +325,47 @@ alias Allocator = StatsCollector!(
 
 	auto ralloc(T, A...)(auto ref A a)
 	{
-		return make!T(_rallocator, a);
+		import core.memory : GC;
+		//return make!T(_rallocator, a);
+		//return new T(a);
+		static if (is(T == class))
+		{
+			// we don't initialize classes because initializing Fiber is slow asf
+			//return cast(T) GC.calloc(__traits(classInstanceSize, T));
+			return cast(T) _rallocator.allocate(__traits(classInstanceSize, T)).ptr;
+		}
+		else
+		{
+			//return cast(T*) GC.calloc(T.sizeof);
+			return cast(T*) _rallocator.allocate(T.sizeof).ptr;
+			//return new T;
+		}
 	}
 
 	void rfree(T)(auto ref T* p)
 	{
-		dispose(_rallocator, p);
+		//dispose(_rallocator, p);
+		import core.memory : GC;
+		//GC.free(cast(void*) p);
+		_rallocator.deallocate((cast(void*) p)[0 .. T.sizeof]);
 	}
 
 	void rfree(T)(auto ref T p)
 	if (is(T == class) || is(T == interface))
 	{
-		dispose(_rallocator, p);
+		//dispose(_rallocator, p);
+		import core.memory : GC;
+		//GC.free(cast(void*) p);
+		_rallocator.deallocate((cast(void*) p)[0 .. __traits(classInstanceSize, T)]);
 	}
 
-	import core.memory : GC;
-
-	void gcfree(T)(auto ref T* p)
+	auto allocateWrappedFibers(int n)
 	{
-		GC.free(cast(void*) p);
-	}
+		auto fibers = new Reactor.WrappedFiber*[n];
+		for (auto i = 0; i < n; i++)
+			fibers[i] = ralloc!(Reactor.WrappedFiber)(cast(void delegate()) {});
 
-	void gcfree(T)(auto ref T p)
-	if (is(T == class) || is (T == interface))
-	{
-		GC.free(cast(void*) p);
+		return fibers;
 	}
 }
 
