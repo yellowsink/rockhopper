@@ -43,8 +43,10 @@ void main()
 	exited = MonoTime.currTime;
 
 	writeln("time to spawn:        ", spawned - before);
-	writeln("time to exit reactor: ", exited - before);
-	writeln("allocated ", allocations, " times, for ", bytesAllocd, " bytes");
+	writeln("time to exit reactor: ", exited - spawned);
+	writeln("total time:           ", exited - before);
+
+	writeln("bytes not cleaned up:", _rallocator.bytesUsed);
 }
 
 /*

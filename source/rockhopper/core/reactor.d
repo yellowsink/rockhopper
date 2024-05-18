@@ -5,29 +5,6 @@ module rockhopper.core.reactor;
 import core.thread.fiber : Fiber;
 import rockhopper.core.suspends : SuspendSend, SuspendReturn;
 
-public __gshared int allocations;
-public __gshared int bytesAllocd;
-
-public template new_(T)
-{
-	import std.traits : isImplicitlyConvertible;
-	static if (isImplicitlyConvertible!(T, Object))
-		alias Ret = T;
-	else
-		alias Ret = T*;
-
-	Ret new_(Args...)(Args a)
-	{
-		allocations++;
-		static if(isImplicitlyConvertible!(T, Object))
-			bytesAllocd += __traits(classInstanceSize, T);
-		else
-			bytesAllocd += T.sizeof;
-		return new T(a);
-	}
-}
-
-
 public {
 	void spawn(void delegate() fn)
 	{
@@ -106,7 +83,7 @@ private struct Reactor
 	void enqueueFiber(void delegate() f)
 	{
 		// It would be nice to not do heap allocation here?
-		fibers ~= new_!(WrappedFiber)(f);
+		fibers ~= ralloc!WrappedFiber(f);
 	}
 
 	void loop()
@@ -134,7 +111,18 @@ private struct Reactor
 			auto newFibersAdded = fibers.length > fibersBefore.length;
 
 			// step 3: remove finished fibers from the list
-			fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
+			auto filtered = new WrappedFiber*[fibers.length];
+			auto fi = 0;
+			foreach (f; fibers)
+			{
+				if (f.fiber.state == Fiber.State.TERM)
+					rfree(f);
+				else
+					filtered[fi++] = f;
+			}
+
+			fibers = filtered[0 .. fi];
+			//fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
 
 			// step 2.5: we have to remove finished fibers BEFORE we loop back around
 			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
@@ -285,7 +273,7 @@ private struct Reactor
 
 		this(void delegate() fn)
 		{
-			fiber = new_!(Fiber)(fn);
+			fiber = ralloc!Fiber(fn);
 		}
 
 		Fiber fiber;
@@ -295,30 +283,74 @@ private struct Reactor
 		bool suspendRegistered;
 		// when set, the result of the suspend (file data, etc) to be passed back to the fiber
 		Nullable!SuspendReturn suspendResult;
+
+		~this()
+		{
+			rfree(fiber);
+		}
 	}
 }
 
 // === ALLOCATOR ===
 
-/* import std.experimental.allocator : make;
 import std.experimental.allocator.building_blocks;
 
 // MagicMemoryMachine can magically produce memory from the OS somehow! awesome!!!
-alias MagicMemoryMachine = StatsCollector!(GCAllocator, Options.num, Options.num);
+alias MagicMemoryMachine = GCAllocator; //StatsCollector!(GCAllocator, Options.numAll, Options.numAll);
 
 // whenever someone deallocates a WrappedFiber, hold onto the memory
 alias WrapFFList = FreeList!(MagicMemoryMachine, Reactor.WrappedFiber.sizeof);
 // whenever someone deallocates aa Fiber, hold onto the memory
 alias FiberFlist = FreeList!(MagicMemoryMachine, __traits(classInstanceSize, Fiber));
 
-alias Allocator = Segregator!(
-	Reactor.WrappedFiber.sizeof, WrapFFList,
-	Segregator!(
-		__traits(classInstanceSize, Fiber),
-		FiberFlist,
-		MagicMemoryMachine
-	)
-); */
+alias Allocator = StatsCollector!(
+		/* Segregator!(
+		Reactor.WrappedFiber.sizeof, WrapFFList,
+		Segregator!(
+			__traits(classInstanceSize, Fiber),
+			FiberFlist,
+			MagicMemoryMachine
+		)
+	), */
+	MagicMemoryMachine,
+	Options.all,
+	Options.all
+);
+
+/* private */ public {
+	import std.experimental.allocator : make, dispose;
+
+	Allocator _rallocator;
+
+	auto ralloc(T, A...)(auto ref A a)
+	{
+		return make!T(_rallocator, a);
+	}
+
+	void rfree(T)(auto ref T* p)
+	{
+		dispose(_rallocator, p);
+	}
+
+	void rfree(T)(auto ref T p)
+	if (is(T == class) || is(T == interface))
+	{
+		dispose(_rallocator, p);
+	}
+
+	import core.memory : GC;
+
+	void gcfree(T)(auto ref T* p)
+	{
+		GC.free(cast(void*) p);
+	}
+
+	void gcfree(T)(auto ref T p)
+	if (is(T == class) || is (T == interface))
+	{
+		GC.free(cast(void*) p);
+	}
+}
 
 // === MIXIN FOR NEATER REGISTERING OF CALLBACKS ===
 
