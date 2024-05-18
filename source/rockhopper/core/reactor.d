@@ -83,7 +83,7 @@ private struct Reactor
 	void enqueueFiber(void delegate() f)
 	{
 		// It would be nice to not do heap allocation here?
-		fibers ~= new WrappedFiber(f);
+		fibers ~= ralloc!WrappedFiber(f);
 	}
 
 	void loop()
@@ -91,7 +91,6 @@ private struct Reactor
 		import eventcore.core : eventDriver;
 		import eventcore.driver : ExitReason;
 		import std.array : array;
-		import std.algorithm : map, filter;
 		import std.datetime : Duration;
 
 		while (fibers.length)
@@ -111,7 +110,18 @@ private struct Reactor
 			auto newFibersAdded = fibers.length > fibersBefore.length;
 
 			// step 3: remove finished fibers from the list
-			fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
+			auto filtered = new WrappedFiber*[fibers.length];
+			auto fi = 0;
+			foreach (f; fibers)
+			{
+				if (f.fiber.state == Fiber.State.TERM)
+					rfree(f);
+				else
+					filtered[fi++] = f;
+			}
+
+			fibers = filtered[0 .. fi];
+			//fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
 
 			// step 2.5: we have to remove finished fibers BEFORE we loop back around
 			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
@@ -131,6 +141,14 @@ private struct Reactor
 			//           .idle -> processed some events
 			//           .outOfWaiters -> no fibers have registered suspends (e.g. yield() without a suspend)
 			//           .timeout -> impossible, lol
+		}
+
+		if (fibers.length)
+		{
+			foreach (f; fibers)
+				rfree(f);
+
+			fibers = [];
 		}
 	}
 
@@ -262,7 +280,7 @@ private struct Reactor
 
 		this(void delegate() fn)
 		{
-			fiber = new Fiber(fn);
+			fiber = ralloc!Fiber(fn);
 		}
 
 		Fiber fiber;
@@ -272,6 +290,48 @@ private struct Reactor
 		bool suspendRegistered;
 		// when set, the result of the suspend (file data, etc) to be passed back to the fiber
 		Nullable!SuspendReturn suspendResult;
+
+		~this()
+		{
+			rfree(fiber);
+		}
+	}
+}
+
+// === ALLOCATOR ===
+private {
+	import std.experimental.allocator : unbounded;
+	import std.experimental.allocator.building_blocks;
+	import std.algorithm.comparison : max;
+	import std.experimental.allocator : make, dispose;
+
+	alias Batched = AllocatorList!((n) => Region!Mallocator(max(1024 * 1024, n)));
+
+	alias FL = FreeList!(Batched, 0, unbounded);
+
+	alias Allocator =
+		Segregator!(
+			Reactor.WrappedFiber.sizeof,
+			FL,
+			FL
+		);
+
+	Allocator _rallocator;
+
+	auto ralloc(T, A...)(auto ref A a)
+	{
+		return make!T(_rallocator, a);
+	}
+
+	void rfree(T)(auto ref T* p)
+	{
+		dispose(_rallocator, p);
+	}
+
+	void rfree(T)(auto ref T p)
+	if (is(T == class) || is(T == interface))
+	{
+		dispose(_rallocator, p);
 	}
 }
 
