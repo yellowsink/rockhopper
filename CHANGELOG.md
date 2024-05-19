@@ -11,6 +11,7 @@
   This should also reduce memory use in the long term as this can reuse memory much more efficiently than the D
   conservative GC can free it.
 - Reduce allocations in the reactor
+- Prevent unlocking an FMutex from a fiber that does not hold it
 
 ## `0.0.1-beta.1`
 

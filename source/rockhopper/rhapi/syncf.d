@@ -116,9 +116,9 @@ struct FMutex
 	}
 	void unlock()
 	{
-		// TODO: should we assert(lockHolder == Fiber.getThis)? or do we allow unlocking from other fibers?
 		assert(lockHolder !is null);
 		assert(lockcount > 0);
+		assert(lockHolder == Fiber.getThis, "you should not unlock a FMutex held by another fiber");
 		lockcount--;
 		if (lockcount == 0) lockHolder = null;
 	}
