@@ -82,7 +82,6 @@ private struct Reactor
 
 	void enqueueFiber(void delegate() f)
 	{
-		// It would be nice to not do heap allocation here?
 		fibers ~= ralloc!WrappedFiber(f);
 	}
 
@@ -95,9 +94,9 @@ private struct Reactor
 
 		while (fibers.length)
 		{
-			// step 1: run all fibers (clone array to not loop over new fibers!)
-			auto fibersBefore = fibers.array;
-			foreach (f; fibersBefore)
+			// step 1: run all fibers (appending to a `fibers` will not include those new ones in the `foreach`)
+			auto fibersBefore = fibers.length;
+			foreach (f; fibers)
 			{
 				_currentFiber = f;
 				f.fiber.call();
@@ -107,7 +106,7 @@ private struct Reactor
 			// step 2: check for new fibers!
 			// if we have new fibers, don't stop and wait for the current fibers to finish blocking, there's more stuff to do!
 			// instead, just loop back round to the start and keep going
-			auto newFibersAdded = fibers.length > fibersBefore.length;
+			auto newFibersAdded = fibers.length > fibersBefore;
 
 			// step 3: remove finished fibers from the list
 			auto filtered = new WrappedFiber*[fibers.length];
@@ -121,7 +120,6 @@ private struct Reactor
 			}
 
 			fibers = filtered[0 .. fi];
-			//fibers = fibers.filter!(f => f.fiber.state != Fiber.State.TERM).array;
 
 			// step 2.5: we have to remove finished fibers BEFORE we loop back around
 			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
@@ -148,7 +146,7 @@ private struct Reactor
 			foreach (f; fibers)
 				rfree(f);
 
-			fibers = [];
+			fibers = null;
 		}
 	}
 
@@ -302,37 +300,31 @@ private struct Reactor
 private {
 	import std.experimental.allocator : unbounded;
 	import std.experimental.allocator.building_blocks;
-	import std.algorithm.comparison : max;
+	import std.algorithm.comparison : max, min;
 	import std.experimental.allocator : make, dispose;
 
+	// allocate in batches of 1kb to reduce amount of tiny fragmented allocs
 	alias Batched = AllocatorList!((n) => Region!Mallocator(max(1024 * 1024, n)));
 
+	// keep hold of reused memory, no size checking happening, but this is okay because
+	// we only use two different size allocations on this allocator, which are segregated.
 	alias FL = FreeList!(Batched, 0, unbounded);
 
-	alias Allocator =
-		Segregator!(
-			Reactor.WrappedFiber.sizeof,
-			FL,
-			FL
-		);
+	enum WFSize = Reactor.WrappedFiber.sizeof;
+	enum FSize = __traits(classInstanceSize, Fiber); // equal to typeid(new Fiber({})).initializer.length
+
+	alias Allocator = Segregator!(min(WFSize, FSize), FL, FL);
 
 	Allocator _rallocator;
 
 	auto ralloc(T, A...)(auto ref A a)
-	{
-		return make!T(_rallocator, a);
-	}
+	if (is(T == Reactor.WrappedFiber) || is(T == Fiber)) // enforce only these two types are used for safety reasons.
+		=> make!T(_rallocator, a);
 
-	void rfree(T)(auto ref T* p)
-	{
-		dispose(_rallocator, p);
-	}
+	void rfree(T)(auto ref T* p) => dispose(_rallocator, p);
 
-	void rfree(T)(auto ref T p)
-	if (is(T == class) || is(T == interface))
-	{
-		dispose(_rallocator, p);
-	}
+	void rfree(T)(auto ref T p) if (is(T == class))
+		=> dispose(_rallocator, p);
 }
 
 // === MIXIN FOR NEATER REGISTERING OF CALLBACKS ===
