@@ -53,6 +53,23 @@ Once it has been notified, waits on it will instantly resolve until it is reset.
 You may pass a duration to wait for either the event or for a timeout, which will return true if the event was raised,
 or false if it returned due to timeout.
 
+## `TEvent`
+
+```d
+class TEvent
+{
+	void notify();
+	void reset();
+	void wait(); [ASYNC]
+}
+```
+
+`TEvent` works effectively the same as an event except that it works across multiple threads.
+You can create a `TEvent` on one thread, then notify it later while another thread's reactor has a fiber waiting on it.
+
+It is the most basic primitive to sync up fibers across multiple threads.
+
+
 ## `FSemaphore`
 
 ```d
@@ -71,6 +88,17 @@ the next wait will resolve instantly, however *every notify will resolve exactly
 If you `notify` the semaphore, and three fibers are `wait`ing, only one will be released.
 
 Similarly, if you notify 5 times on a semaphore, the next 5 waits will resolve instantly, and the 6th will then pause.
+
+## `TSemaphore`
+
+```d
+class TSemaphore
+{
+	void notify();
+	bool tryWait();
+	void wait(); [ASYNC]
+}
+```
 
 ## `FMutex`
 
@@ -172,32 +200,3 @@ Be careful with this! You can safely instantiate this template on a named functi
 but using this on a lambda is basically pointless.
 
 This is equivalent to wrapping the call in an FMutex.
-
-## `TEvent`
-
-```d
-class TEvent
-{
-	void notify();
-	void reset();
-	void wait(); [ASYNC]
-}
-```
-
-`TEvent` works effectively the same as an `FMutex` except that it works across multiple threads.
-You can create a `TEvent` on one thread, then notify it later while another thread's reactor has a fiber waiting on it.
-
-It is the most basic primitive to sync up fibers across multiple threads.
-
-## `TSemaphore`
-
-```d
-class TSemaphore
-{
-	void notify();
-	bool tryWait();
-	void wait(); [ASYNC]
-}
-```
-
-`TSemaphore` works like a semaphore, but it works across threads as well as working across fibers.
