@@ -18,58 +18,33 @@ import eventcore.core : eventDriver;
 
 import core.thread.osthread : Thread;
 
-/* void main()
-{
-	enum AMOUNT = 100_000;
-
-	writeln("spawning ", AMOUNT, " co-existent fibers on one reactor...");
-
-	MonoTime before;
-	MonoTime spawned;
-	MonoTime exited;
-
-	entrypoint({
-		// yes, these fibers all immediately die, yes thats fine, they don't get a chance to run and hence die until
-		// this one yields anyway.
-
-		before = MonoTime.currTime;
-
-		for (auto i = 0; i < AMOUNT; i++)
-			spawn({});
-
-		spawned = MonoTime.currTime;
-	});
-
-	exited = MonoTime.currTime;
-
-	writeln("time to spawn:        ", spawned - before);
-	writeln("time to exit reactor: ", exited - spawned);
-	writeln("total time:           ", exited - before);
-
-	writeln("bytes not cleaned up:", _rallocator.bytesUsed);
-} */
-
-
 
 void main()
 {
-	enum BATCH = 1000;
-	enum COUNT = 100_000;
+	entrypoint({
 
-	writeln("allocating ", BATCH, " co-existent fibers on one reactor ", COUNT, " times in a row ...");
+		auto done = false;
 
-	auto before = MonoTime.currTime;
+		import rockhopper.rhapi.file : File, FileOpenMode;
 
-	for (auto c = 0; c < COUNT; c++)
-	{
-		// allocate
-		//auto fibs = allocateWrappedFibers(BATCH);
+		File f;
 
-		// deallocate
-		//foreach (f; fibs)
-			//rfree(f);
-	}
+		spawn({
+			// whenever the main fiber yields, print out the underlying data in the struct.
+			while (!done)
+			{
+				auto ptr = cast(ubyte*) &f;
+				writeln(ptr[0 .. File.sizeof]);
+				yield();
+			}
 
-	writeln("time: ", MonoTime.currTime - before);
+			auto ptr = cast(ubyte*)&f;
+			writeln(ptr[0 .. File.sizeof]);
+		});
+
+		f = File("testscript.d", FileOpenMode.read); // async construction!
+		done = true;
+
+	});
 }
 
