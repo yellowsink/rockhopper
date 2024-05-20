@@ -12,6 +12,11 @@ very efficient.
 They should be familiar to developers coming both from traditional thread syncing (mutexes, events, etc),
 and languages like Go (wait groups, message boxes ~= channels).
 
+`synct` classes are safe to make `shared` (in fact, they *should* be `shared` as a rule)
+and all methods will synchronously use locks to ensure thread safety
+(which is non-ideal, but not a huge deal in this case).
+They are carefully written to stay in locked sections as briefly as possible, and to avoid potential deadlocks.
+
 ## Note on `syncf` structs
 
 The fiber syncing structs are stack allocated for efficiency, but this has a drawback. Value semantics.
@@ -108,4 +113,91 @@ This does not enforce immutability when read locked as it does not encapsulate a
 "many read, one write" lock mechanism as long as all usages act in good faith (which they should, as if you've got
 issues with that, it's because you've chosen to disobey the lock in your own code.)
 
-// TODO finish
+## `FGuardedResult(T)`
+
+```d
+struct FGuardedResult(T)
+{
+	bool hasValue();
+	void set(T val);
+	void nullify();
+	T get(); [ASYNC]
+	Nullable!T tryGet();
+}
+```
+
+This is effectively a combination of an event and a local variable - when attempting to get a value when it has yet to
+be set, the fiber will wait for it to be set by another.
+
+## `FWaitGroup`
+
+```d
+struct FWaitGroup
+{
+	void add(uint);
+	void done();
+	void wait(); [ASYNC]
+}
+```
+
+Wait groups are useful for parallel processing - add the number of fibers you're running, have each one call `done` once
+it's finished, then `wait` for them all to finish.
+This should be familiar to Go programmers.
+
+## `FMessageBox(T)`
+
+```d
+struct FMessageBox(T)
+{
+	void send(T val); [ASYNC]
+	void send(T val, false);
+	T receive(); [ASYNC]
+	Nullable!T tryReceive();
+}
+```
+
+A message box contains a list of values, which allow sending messages between fibers asynchronously.
+It works like channels in Go.
+
+## `fSynchronized(alias F)`
+
+```d
+ReturnType!F fSynchronized(alias F)(Parameters!F) [ASYNC]
+```
+
+`fSynchronized` can be used similarly to the D `synchronized` attribute. Only one fiber is allowed to call the function
+at once per instance of the template.
+
+Be careful with this! You can safely instantiate this template on a named function and have it be the same everywhere,
+but using this on a lambda is basically pointless.
+
+This is equivalent to wrapping the call in an FMutex.
+
+## `TEvent`
+
+```d
+class TEvent
+{
+	void notify();
+	void reset();
+	void wait(); [ASYNC]
+}
+```
+
+`TEvent` works effectively the same as an `FMutex` except that it works across multiple threads.
+You can create a `TEvent` on one thread, then notify it later while another thread's reactor has a fiber waiting on it.
+
+It is the most basic primitive to sync up fibers across multiple threads.
+
+## `TSemaphore`
+
+```d
+class TSemaphore
+{
+	void notify();
+	bool tryWait();
+	void wait(); [ASYNC]
+}
+```
+
+`TSemaphore` works like a semaphore, but it works across threads as well as working across fibers.

@@ -210,29 +210,31 @@ struct FGuardedResult(T)
 
 	@disable this(ref FGuardedResult); // see FEvent::this(ref FEvent)
 
-	bool hasValue;
+	private bool _hasValue;
 	private T value;
+
+	bool hasValue() inout @property { return _hasValue; }
 
 	void set(T val)
 	{
 		value = val;
-		hasValue = true;
+		_hasValue = true;
 	}
 
 	void nullify() {
-		hasValue = false;
+		_hasValue = false;
 		value = T.init;
 	}
 
 	T get()
 	{
-		while (!hasValue) yield();
+		while (!_hasValue) yield();
 		return value;
 	}
 
 	Nullable!T tryGet()
 	{
-		if (hasValue) return value;
+		if (_hasValue) return value;
 		else return Nullable!T.init;
 	}
 }
