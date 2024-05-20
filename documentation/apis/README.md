@@ -5,11 +5,11 @@ This is to match a wide range of needs and use cases.
 
 Broadly, there are three primary sets of APIs. `core` (and within it, `llevents`), `rhapi`, and `std`.
 
-`core` provides the lowest level tools to interact with Rockhopper.
+[`core`](core/README.md) provides the lowest level tools to interact with Rockhopper.
 Within it are tools for talking directly to the reactor, and all the other APIs can be built using a combination of
 rockhopper core and [`eventcore`](https://github.com/vibe-d/eventcore/).
 
-`rhapi` is the native API for writing programs with rockhopper.
+[`rhapi`](rhapi/README.md) is the native API for writing programs with rockhopper.
 It has high level, easy to use interfaces for asynchronous programming, with as much flexibility as is practical
 exposed.
 
