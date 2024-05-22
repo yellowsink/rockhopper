@@ -23,11 +23,11 @@ void main()
 {
 	entrypoint({
 
-		import rockhopper.rhapi.file : File, FileOpenMode, FileIOException;
+		import rockhopper.rhapi.file : stdout;
+		import std.string : representation;
 		import eventcore.driver : IOStatus;
 
-		auto f = File("testscript.d", FileOpenMode.read);
-		f.open("penis.txt", FileOpenMode.read);
+		stdout.rawWrite(0, representation("hiiiiii :3"));
 
 
 	});

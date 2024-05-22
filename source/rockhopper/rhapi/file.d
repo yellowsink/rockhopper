@@ -90,12 +90,12 @@ struct File
 
 	// === CONSTRUCTORS ===
 
-	this(int handle, string name, uint refs = 1, bool noAutoClose = false) nothrow
+	this(int handle, string name, uint refs = 1, bool noAutoClose = true) nothrow
 	{
 		initialize(eventDriver.files.adopt(handle), name, refs, noAutoClose);
 	}
 
-	this(FileFD handle, string name, uint refs = 1, bool noAutoClose = false) @nogc nothrow
+	this(FileFD handle, string name, uint refs = 1, bool noAutoClose = true) @nogc nothrow
 	{
 		initialize(handle, name, refs, noAutoClose);
 	}
@@ -117,7 +117,7 @@ struct File
 	this(string name, FileOpenMode mode) @trusted @Async
 	{
 		auto fd = fileOpen(name, mode);
-		check!(OpenStatus.ok)(opened.status, (s) => "open failed: " ~ s);
+		check!(OpenStatus.ok)(fd.status, (s) => "open failed: " ~ s);
 
 		initialize(fd.fd, name);
 	}
@@ -234,4 +234,21 @@ struct File
 		check!(IOStatus.ok)(res.status, (s) => "write error: " ~ s);
 		return res.bytesRWd;
 	}
+}
+
+import core.sys.posix.unistd : STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO;
+
+File stdin() @property // @suppress(dscanner.confusing.function_attributes)
+{
+	return File(STDIN_FILENO, null);
+}
+
+File stdout() @property // @suppress(dscanner.confusing.function_attributes)
+{
+	return File(STDOUT_FILENO, null);
+}
+
+File stderr() @property // @suppress(dscanner.confusing.function_attributes)
+{
+	return File(STDERR_FILENO, null);
 }
