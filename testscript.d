@@ -23,29 +23,12 @@ void main()
 {
 	entrypoint({
 
-		auto done = false;
+		import rockhopper.rhapi.file : File, FileOpenMode, FileIOException;
+		import eventcore.driver : IOStatus;
 
-		import rockhopper.rhapi.file : File, FileOpenMode;
+		auto f = File("testscript.d", FileOpenMode.read);
+		f.open("penis.txt", FileOpenMode.read);
 
-		File f;
-
-		spawn({
-			// whenever the main fiber yields, print out the underlying data in the struct.
-			while (!done)
-			{
-				auto ptr = cast(ubyte*) &f;
-				writeln(ptr[0 .. File.sizeof]);
-				yield();
-			}
-
-			auto ptr = cast(ubyte*)&f;
-			writeln(ptr[0 .. File.sizeof]);
-		});
-
-		f = File("testscript.d", FileOpenMode.read); // async construction!
-		done = true;
-
-		writeln(f.fileno);
 
 	});
 }
