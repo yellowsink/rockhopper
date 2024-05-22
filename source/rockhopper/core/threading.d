@@ -4,6 +4,7 @@ module rockhopper.core.threading;
 
 import rockhopper.core.reactor : entrypoint, spawn;
 import rockhopper.core.llevents : waitThreadEvent;
+import rockhopper.core.uda : Async;
 
 import eventcore.driver : EventDriver;
 import eventcore.core : eventDriver;
@@ -25,7 +26,7 @@ struct ThreadHandle
 }
 
 // spawns a new thread and runs the given function as a fiber in that thread's reactor
-ThreadHandle spawnThread(void delegate() fn)
+ThreadHandle spawnThread(void delegate() fn) @Async
 {
 	auto ev = eventDriver.events.create();
 	shared sd = cast(shared) eventDriver;
@@ -81,7 +82,7 @@ void spawnInThread(shared(EventDriver) ed, void delegate() fn)
 }
 
 // waits for a thread to exit asynchronously
-void joinThread(Thread th)
+void joinThread(Thread th) @Async
 {
 	auto ev = eventDriver.events.create();
 	shared ed = cast(shared) eventDriver;

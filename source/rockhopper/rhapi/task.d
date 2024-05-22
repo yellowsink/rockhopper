@@ -4,6 +4,7 @@ module rockhopper.rhapi.task;
 
 import rockhopper.core.reactor : spawn; // used in constructor and in then
 import rockhopper.rhapi.syncf : FEvent; // used for syncing the fibers
+import rockhopper.core.uda : Async;
 
 import std.typecons : Nullable; // used by tryGetRes
 
@@ -63,7 +64,7 @@ struct Task(T)
 			return isFinished ? MAYBERES(res) : MAYBERES.init;
 	}
 
-	T waitRes()
+	T waitRes() @Async
 	{
 		ev.wait();
 		static if(VALUED) return res;
@@ -103,13 +104,13 @@ auto completedTask(T)(T value)
 	return Task!T(value);
 }
 
-void waitAllTasks(T)(Task!T*[] tasks)
+void waitAllTasks(T)(Task!T*[] tasks) @Async
 {
 	foreach (t; tasks) t.waitRes(); // lol
 }
 
 // heterogenous version
-void waitAllTasks(TASKS...)()
+void waitAllTasks(TASKS...)() @Async
 {
 	import std.traits : isInstanceOf;
 
@@ -121,7 +122,7 @@ void waitAllTasks(TASKS...)()
 	}
 }
 
-void waitAnyTask(T)(Task!T*[] tasks)
+void waitAnyTask(T)(Task!T*[] tasks) @Async
 {
 	FEvent ev;
 
@@ -135,7 +136,7 @@ void waitAnyTask(T)(Task!T*[] tasks)
 }
 
 // heterogenous
-void waitAnyTask(TASKS...)()
+void waitAnyTask(TASKS...)() @Async
 {
 	import std.traits : isInstanceOf, TemplateArgsOf;
 

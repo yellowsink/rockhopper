@@ -4,14 +4,17 @@
 // is allowed to lock that mutex, across many threads.
 
 module rockhopper.rhapi.synct;
+import rockhopper.core.uda : Async, ThreadSafe;
 
 import rockhopper.core.llevents : waitThreadEvent;
 import core.atomic : atomicOp;
 
 // These need to be classes so we can use `synchronized(this)` and `synchronized` members
 
-final shared class TEvent
+final shared @ThreadSafe class TEvent
 {
+@ThreadSafe:
+
 	import eventcore.core : eventDriver;
 	import eventcore.driver : EventID, EventDriver;
 	import std.typecons : Tuple, tuple;
@@ -50,7 +53,7 @@ final shared class TEvent
 		}
 	}
 
-	void wait()
+	void wait() @Async
 	{
 		auto tid = Thread.getThis.id;
 
@@ -85,8 +88,10 @@ final shared class TEvent
 	}
 }
 
-final shared class TSemaphore
+final shared @ThreadSafe class TSemaphore
 {
+@ThreadSafe:
+
 	// we always access this inside of a `synchronized` so atomics are unnecessary
 	// __gshared disables the compiler enforcement for that
 	// MAKE SURE YOU NEVER USE THIS OUTSIDE OF A `synchronized(this)` OR `synchronized` METHOD
@@ -112,7 +117,7 @@ final shared class TSemaphore
 		return true;
 	}
 
-	void wait()
+	void wait() @Async
 	{
 		// check if we can go immediately
 		synchronized (this)

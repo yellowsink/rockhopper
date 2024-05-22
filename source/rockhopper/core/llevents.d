@@ -6,6 +6,7 @@ module rockhopper.core.llevents;
 
 // general imports
 import rockhopper.core.reactor : llawait, yield;
+import rockhopper.core.uda : Async;
 // yield should only be used for the socket wrappers, all others should use llawait only
 import rockhopper.core.suspends;
 import eventcore.core : eventDriver;
@@ -35,7 +36,7 @@ import std.socket : Address;
 // sleep related imports
 import std.datetime : Duration, dur;
 
-SRStreamConnect streamConnect(Address peer, Address bind)
+SRStreamConnect streamConnect(Address peer, Address bind) @Async
 {
 	return llawait(SuspendSend.streamConnect(SSStreamConnect(peer, bind))).streamConnectValue;
 }
@@ -85,7 +86,7 @@ struct StreamListen
 		eventDriver.sockets.releaseRef(fd.get);
 	}
 
-	Tuple!(StreamSocketFD, RefAddress) wait()
+	Tuple!(StreamSocketFD, RefAddress) wait() @Async
 	{
 		while (sockets is null || !sockets.length) yield();
 
@@ -95,42 +96,42 @@ struct StreamListen
 	}
 }
 
-SRRW streamRead(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+SRRW streamRead(StreamSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.streamRead(SSStreamRead(fd, 0, buf, mode))).rwValue;
 }
 
-IOStatus streamWaitForData(StreamSocketFD fd)
+IOStatus streamWaitForData(StreamSocketFD fd) @Async
 {
 	return streamRead(fd, []).status;
 }
 
-SRDgramSendReceive dgramReceive(DatagramSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once)
+SRDgramSendReceive dgramReceive(DatagramSocketFD fd, ubyte[] buf, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.dgramReceive(SSDgramReceive(fd, 0, buf, mode))).dgramSendReceiveValue;
 }
 
-SRDgramSendReceive dgramSend(DatagramSocketFD fd, const(ubyte)[] buf, Address target, IOMode mode = IOMode.once)
+SRDgramSendReceive dgramSend(DatagramSocketFD fd, const(ubyte)[] buf, Address target, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.dgramSend(SSDgramSend(fd, buf, mode, target))).dgramSendReceiveValue;
 }
 
-SRRW streamWrite(StreamSocketFD fd, const(ubyte)[] buf, IOMode mode = IOMode.once)
+SRRW streamWrite(StreamSocketFD fd, const(ubyte)[] buf, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.streamWrite(SSStreamWrite(fd, 0, buf, mode))).rwValue;
 }
 
-SRNsLookup nsLookup(string name)
+SRNsLookup nsLookup(string name) @Async
 {
 	return llawait(SuspendSend.nsLookup(name)).nsLookupValue;
 }
 
-void waitThreadEvent(EventID evid)
+void waitThreadEvent(EventID evid) @Async
 {
 	llawait(SuspendSend.threadEvent(evid));
 }
 
-SRFileOpen fileOpen(string path, FileOpenMode mode)
+SRFileOpen fileOpen(string path, FileOpenMode mode) @Async
 {
 	return llawait(SuspendSend.fileOpen(SSFileOpen(path, mode))).fileOpenValue;
 }
@@ -138,44 +139,44 @@ SRFileOpen fileOpen(string path, FileOpenMode mode)
 // this always returns instantly, btw
 // https://github.com/vibe-d/eventcore/blob/515edf9b7ebf47d08b0cec8a7a5ae2cced30be71/source/eventcore/drivers/threadedfile.d#L250
 // therefore it doesn't *really* need to go via the reactor, but oh well. Plus releaseref works too.
-CloseStatus fileClose(FileFD fd)
+CloseStatus fileClose(FileFD fd) @Async
 {
 	return llawait(SuspendSend.fileClose(fd)).fileCloseValue;
 }
 
-SRRW fileRead(FileFD fd, ulong oset, ubyte[] buffer, IOMode mode = IOMode.once)
+SRRW fileRead(FileFD fd, ulong oset, ubyte[] buffer, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.fileRead(SSFileRead(fd, oset, buffer, mode))).rwValue;
 }
 
-SRRW pipeRead(PipeFD fd, ubyte[] buffer, IOMode mode = IOMode.once)
+SRRW pipeRead(PipeFD fd, ubyte[] buffer, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.pipeRead(SSPipeRead(fd, 0, buffer, mode))).rwValue;
 }
 
-SRRW fileWrite(FileFD fd, ulong oset, const(ubyte)[] buffer, IOMode mode = IOMode.once)
+SRRW fileWrite(FileFD fd, ulong oset, const(ubyte)[] buffer, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.fileWrite(SSFileWrite(fd, oset, buffer, mode))).rwValue;
 }
 
-SRRW pipeWrite(PipeFD fd, const(ubyte)[] buffer, IOMode mode = IOMode.once)
+SRRW pipeWrite(PipeFD fd, const(ubyte)[] buffer, IOMode mode = IOMode.once) @Async
 {
 	return llawait(SuspendSend.pipeWrite(SSPipeWrite(fd, 0, buffer, mode))).rwValue;
 }
 
-int processWait(ProcessID pid)
+int processWait(ProcessID pid) @Async
 {
 	return llawait(SuspendSend.procWait(pid)).procWaitValue;
 }
 
-SignalStatus signalTrap(int sig)
+SignalStatus signalTrap(int sig) @Async
 {
 	auto result = llawait(SuspendSend.signalTrap(sig)).signalTrapValue;
 	eventDriver.signals.releaseRef(result.slID);
 	return result.status;
 }
 
-void sleep(Duration d)
+void sleep(Duration d) @Async
 {
 
 	// 0ms repeat = don't repeat

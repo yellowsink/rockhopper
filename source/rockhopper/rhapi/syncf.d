@@ -8,6 +8,7 @@ module rockhopper.rhapi.syncf;
 
 import rockhopper.core.reactor : yield, spawn;
 import rockhopper.core.llevents : sleep;
+import rockhopper.core.uda : Async;
 import std.datetime : Duration;
 import core.thread.fiber : Fiber;
 
@@ -24,12 +25,12 @@ struct FEvent
 	void notify() { raised = true; }
 	void reset() { raised = false; }
 
-	void wait()
+	void wait() @Async
 	{
 		while (!raised) yield();
 	}
 
-	bool wait(Duration timeout)
+	bool wait(Duration timeout) @Async
 	{
 		bool timedOut;
 		spawn({
@@ -61,13 +62,13 @@ struct FSemaphore
 		return true;
 	}
 
-	void wait()
+	void wait() @Async
 	{
 		while (count == 0) yield();
 		count--;
 	}
 
-	bool wait(Duration timeout)
+	bool wait(Duration timeout) @Async
 	{
 		bool timedOut;
 		spawn({
@@ -94,7 +95,7 @@ struct FMutex
 	private Fiber lockHolder; // null-safety: will be null iff lockcount == 0.
 	private uint lockcount;
 
-	void lock()
+	void lock() @Async
 	{
 		auto thisF = Fiber.getThis;
 
@@ -135,7 +136,7 @@ struct FRWMutex
 	private bool writeLocked;
 	private uint readLocks; // writeLocked => readLocks = 0 (in the mathematical sense of =>)
 
-	void lockWrite()
+	void lockWrite() @Async
 	{
 		// note that after waiting for all read locks to be freed, a write lock may have been placed again!
 		// (or vice versa) so we must write to ensure no locks AT ALL before locking
@@ -149,7 +150,7 @@ struct FRWMutex
 		writeLocked = true;
 	}
 
-	void lockRead()
+	void lockRead() @Async
 	{
 		if (writeLocked)
 		{
@@ -193,7 +194,7 @@ template fSynchronized(alias func)
 	{
 		FMutex m;
 
-		ReturnType!func fSynchronized(Parameters!func args)
+		ReturnType!func fSynchronized(Parameters!func args) @Async
 		{
 			m.lock();
 			func(args);
@@ -226,7 +227,7 @@ struct FGuardedResult(T)
 		value = T.init;
 	}
 
-	T get()
+	T get() @Async
 	{
 		while (!_hasValue) yield();
 		return value;
@@ -261,7 +262,7 @@ struct FWaitGroup
 		count--;
 	}
 
-	void wait()
+	void wait() @Async
 	{
 		while (count > 0) yield();
 	}
@@ -278,7 +279,7 @@ struct FMessageBox(T)
 
 	private DList!T queue;
 
-	void send(T val, bool shouldYield = true)
+	void send(T val, bool shouldYield = true) @Async
 	{
 		queue.insertBack(val);
 
@@ -286,7 +287,7 @@ struct FMessageBox(T)
 		if (shouldYield) yield();
 	}
 
-	T receive()
+	T receive() @Async
 	{
 		while (queue.empty) yield();
 

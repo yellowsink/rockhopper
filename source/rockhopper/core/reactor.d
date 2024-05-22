@@ -4,6 +4,7 @@ module rockhopper.core.reactor;
 // === PUBLIC API ===
 import core.thread.fiber : Fiber;
 import rockhopper.core.suspends : SuspendSend, SuspendReturn;
+import rockhopper.core.uda : Async;
 
 public {
 	void spawn(void delegate() fn)
@@ -26,11 +27,11 @@ public {
 	}
 
 	// Fiber.yield() for convenience
-	alias yield = Fiber.yield;
+	void yield() @Async => Fiber.yield();
 
 	// return type must be the same as WrappedFiber.suspendResult
 	// This function informs the reactor to pause your fiber and potentially entire thread on the given suspend.
-	SuspendReturn llawait(SuspendSend bl)
+	SuspendReturn llawait(SuspendSend bl) @Async
 	{
 		assert(
 			!reactor._currentFiber.isNull,

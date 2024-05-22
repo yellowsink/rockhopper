@@ -14,6 +14,7 @@
   conservative GC can free it.
 - Reduce allocations in the reactor
 - Prevent unlocking an FMutex from a fiber that does not hold it
+- Add `@Async` and `@ThreadSafe` UDAs
 
 ## `0.0.1-beta.1`
 
