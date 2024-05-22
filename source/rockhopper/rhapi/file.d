@@ -4,7 +4,7 @@ import rockhopper.core.reactor;
 import rockhopper.core.uda;
 
 public import eventcore.driver : FileOpenMode;
-import eventcore.driver : FileFD, OpenStatus, IOStatus;
+import eventcore.driver : FileFD, PipeFD, OpenStatus, IOStatus;
 
 
 /*
@@ -54,6 +54,15 @@ class FileException(S) : Exception
 alias FileIOException = FileException!IOStatus;
 alias FileOpenException = FileException!OpenStatus;
 
+// throws FileException!S if v != OK
+private void check(alias OK, alias TEM)(typeof(OK) v)
+{
+	import std.exception : enforce;
+	import std.conv : to;
+
+	enforce(v == OK, new FileException!(typeof(OK))(v, TEM(v.to!string)));
+}
+
 // a quick note on types
 // int / HANDLE  system FD or handle
 // FILE* C       stdio.h streams <-- *THIS IS A RED HERRING, RESIST THE URGE TO USE THIS HERE*
@@ -61,25 +70,37 @@ alias FileOpenException = FileException!OpenStatus;
 // FileFD        wraps an int / HANDLE
 // rh File       wraps a FileFD
 
-// note: unlike sync, this *is* copyable via refcounting
+// copyable via refcounting, auto closes on last detach
 // modelled after the implementation of phobos/std/stdio.d/File
-struct File
+// if pipe, then reads and writes will not accept offsets etc. use the appropriate one for your FD type
+private struct FileOrPipe(bool IS_PIPE = false)
 {
 @safe:
 
-	import std.traits : Parameters, ReturnType;
+	import std.meta : AliasSeq;
 	import core.memory : pureMalloc, pureFree;
 	import core.atomic : atomicStore, atomicLoad, atomicOp;
 	import eventcore.core : eventDriver;
 
-	import rockhopper.core.llevents : fileOpen, fileClose, fileRead, fileWrite;
+	import rockhopper.core.llevents : fileOpen, fileClose, fileRead, fileWrite, pipeRead, pipeWrite;
 	import rockhopper.rhapi.syncf : FMutex; // TODO: TMutex
+
+	// make it easy to refer to the necessary driver
+	static if(IS_PIPE)
+		private auto driverfp = () => eventDriver.pipes;
+	else
+		private auto driverfp = () => eventDriver.files;
+
+	static if (IS_PIPE)
+		private alias FD = PipeFD;
+	else
+		private alias FD = FileFD;
 
 	// === STORAGE ===
 
 	// struct to keep it all close together in memory
 	private struct Impl {
-		FileFD fd; // null if another instance closes this file
+		FD fd; // null if another instance closes this file
 		shared uint refCount;
 		bool noAutoClose; // if true, never close automatically
 		FMutex mutex;
@@ -90,17 +111,19 @@ struct File
 
 	// === CONSTRUCTORS ===
 
-	this(int handle, string name, uint refs = 1, bool noAutoClose = true) nothrow
+	this(int handle, string name, bool noAutoClose = true, uint refs = 1) nothrow
 	{
-		initialize(eventDriver.files.adopt(handle), name, refs, noAutoClose);
+		import std.stdio : writeln;
+		try { writeln("constructed fd ", handle); } catch (Exception) {}
+		initialize(driverfp().adopt(handle), name, noAutoClose, refs);
 	}
 
-	this(FileFD handle, string name, uint refs = 1, bool noAutoClose = true) @nogc nothrow
+	this(FD handle, string name, bool noAutoClose = true, uint refs = 1) @nogc nothrow
 	{
-		initialize(handle, name, refs, noAutoClose);
+		initialize(handle, name, noAutoClose, refs);
 	}
 
-	private void initialize(FileFD handle, string name, uint refs = 1, bool noAutoClose = false) @nogc nothrow @trusted
+	private void initialize(FD handle, string name, bool noAutoClose = false, uint refs = 1) @nogc nothrow @trusted
 	{
 		assert(!_impl);
 		_impl = cast(Impl*) pureMalloc(Impl.sizeof);
@@ -114,12 +137,15 @@ struct File
 	}
 
 	// i've checked, async *struct* constructors are safe!
-	this(string name, FileOpenMode mode) @trusted @Async
+	static if (!IS_PIPE)
 	{
-		auto fd = fileOpen(name, mode);
-		check!(OpenStatus.ok)(fd.status, (s) => "open failed: " ~ s);
+		this(string name, FileOpenMode mode) @trusted @Async
+		{
+			auto fd = fileOpen(name, mode);
+			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(fd.status);
 
-		initialize(fd.fd, name);
+			initialize(fd.fd, name);
+		}
 	}
 
 	// === LIFECYCLE ===
@@ -140,46 +166,40 @@ struct File
 		if (!_impl) return;
 		scope(exit) _impl = null;
 
+		import std.stdio : writeln;
+		try { writeln("detached from fd ", _impl.fd); } catch (Throwable) {}
+
 		if (atomicOp!"-="(_impl.refCount, 1) == 0)
 		{
 			scope(exit) pureFree(_impl);
 
 			if (!_impl.noAutoClose)
-				eventDriver.files.releaseRef(_impl.fd); // closes the fd synchronously
+				driverfp().releaseRef(_impl.fd); // closes the fd synchronously
 		}
-	}
-
-	// === UTILS ===
-
-	// throws FileException!S if v != OK
-	private void check(alias OK)(typeof(OK) v, string delegate(string) @safe TEM)
-	{
-		import std.exception : enforce;
-		import std.conv : to;
-
-		enforce(v == OK, new FileException!(typeof(OK))(v, TEM(v.to!string)));
 	}
 
 	// === FILE OPERATIONS ===
 
 	// replaces the currently open file of this instance with a new one
-	void open(string name, FileOpenMode mode) @trusted @Async
+	static if (!IS_PIPE)
 	{
-		if (_impl !is null)
+		void open(string name, FileOpenMode mode) @trusted @Async
+		{
 			detach(); // if this instance points to a file, detach
 
-		auto opened = fileOpen(name, mode);
-		// if this fails, leaves the file with no _impl attached cleanly.
-		check!(OpenStatus.ok)(opened.status, (s) => "open failed: " ~ s);
+			auto opened = fileOpen(name, mode);
+			// if this fails, leaves the file with no _impl attached cleanly.
+			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(opened.status);
 
-		initialize(opened.fd, name);
+			initialize(opened.fd, name);
+		}
 	}
 
 	// need to check fd because will be null if another instance closed the file.
 	@property bool isOpen() const pure nothrow
 		=> _impl !is null && _impl.fd;
 
-	// if open closes, else does nothing
+	// if open, closes, else does nothing
 	void close() @trusted
 	{
 		if (!_impl) return;
@@ -195,20 +215,21 @@ struct File
 		if (!_impl.fd) return; // already closed on another thread
 		scope(exit) _impl.fd = typeof(_impl.fd).init; // why not
 
-		eventDriver.files.releaseRef(_impl.fd); // close
+		driverfp().releaseRef(_impl.fd); // close
 	}
 
-	void sync() @trusted
+	static if (!IS_PIPE)
 	{
-		// TODO: Windows support
-		// TODO: Darwin support
-		import core.sys.posix.unistd : fsync;
-		import std.exception : errnoEnforce;
+		void sync() @trusted
+		{
+			// TODO: Windows support
+			// TODO: Darwin support
+			import core.sys.posix.unistd : fsync;
+			import std.exception : errnoEnforce;
 
-		errnoEnforce(fsync(fileno) == 0);
+			errnoEnforce(fsync(fileno) == 0);
+		}
 	}
-
-	// TODO: actual I/O apis
 
 	@property int fileno() const @trusted
 	{
@@ -217,38 +238,132 @@ struct File
 		return cast(int) fd;
 	}
 
-	ulong rawRead(ulong oset, ubyte[] buf) @trusted @Async
+	// make the offset arg only exist for files without having to declare the functions twice
+	static if (IS_PIPE)
+		private alias OFFSET_ARGS = AliasSeq!();
+	else
+		private alias OFFSET_ARGS = AliasSeq!ulong;
+
+	ulong rawRead(OFFSET_ARGS oset, ubyte[] buf) @trusted @Async
 	{
+		import std.stdio : writeln;
+		writeln("read from fd ", _impl.fd);
+
 		_impl.mutex.lock();
-		auto res = fileRead(_impl.fd, oset, buf);
+
+		static if (IS_PIPE)
+			auto res = pipeRead(_impl.fd, buf);
+		else
+			auto res = fileRead(_impl.fd, oset[0], buf);
+
 		_impl.mutex.unlock();
-		check!(IOStatus.ok)(res.status, (s) => "read error: " ~ s);
+		check!(IOStatus.ok, (s) => "read error: " ~ s)(res.status);
 		return res.bytesRWd;
 	}
 
-	ulong rawWrite(ulong oset, const(ubyte)[] buf) @trusted @Async
+	ulong rawWrite(OFFSET_ARGS oset, const(ubyte)[] buf) @trusted @Async
 	{
+		import std.stdio : writeln;
+		writeln("write from fd ", _impl.fd);
+
 		_impl.mutex.lock();
-		auto res = fileWrite(_impl.fd, oset, buf);
+
+		static if (IS_PIPE)
+			auto res = pipeWrite(_impl.fd, buf);
+		else
+			auto res = fileWrite(_impl.fd, oset[0], buf);
+
 		_impl.mutex.unlock();
-		check!(IOStatus.ok)(res.status, (s) => "write error: " ~ s);
+		check!(IOStatus.ok, (s) => "write error: " ~ s)(res.status);
 		return res.bytesRWd;
+	}
+}
+
+// wraps a file handle
+alias File = FileOrPipe!false;
+// wraps one end of a pipe handle
+alias PipeEnd = FileOrPipe!true;
+
+// wraps a complete pipe with a read and write end
+struct Pipe
+{
+	PipeEnd _read;
+	PipeEnd _write;
+
+	@property PipeEnd readEnd() @safe nothrow { return _read; }
+	@property PipeEnd writeEnd() @safe nothrow { return _write; }
+
+	// generally should be unnecessary, as both pipes will automatically close themselves when
+	// there are no more references to them
+	void close() @safe
+	{
+		_read.close();
+		_write.close();
+	}
+
+	// creates a pipe!
+	// cannot just be a default constructor for struct reasons
+	static Pipe create()
+	{
+		// https://github.com/dlang/phobos/blob/c970ca6/std/process.d#L2756
+		version (Posix)
+		{
+			import core.sys.posix.unistd : pipe;
+			int[2] fds;
+			check!(0, (_) => "failed to open pipe")(pipe(fds));
+
+			Pipe p;
+			p._read = PipeEnd(fds[0], null);
+			p._write = PipeEnd(fds[1], null);
+			return p;
+		}
+		else
+		{
+			// TODO
+		}
 	}
 }
 
 import core.sys.posix.unistd : STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO;
 
-File stdin() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEnd getStdin() @property // @suppress(dscanner.confusing.function_attributes)
 {
-	return File(STDIN_FILENO, null);
+	int fd;
+	// TODO: other platforms than POSIX
+	version (Posix)
+	{
+		import core.sys.posix.unistd : dup;
+		fd = dup(STDIN_FILENO);
+		assert(fd);
+	}
+
+	return PipeEnd(fd, null, false);
 }
 
-File stdout() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEnd getStdout() @property // @suppress(dscanner.confusing.function_attributes)
 {
-	return File(STDOUT_FILENO, null);
+	int fd;
+	version (Posix)
+	{
+		import core.sys.posix.unistd : dup;
+
+		fd = dup(STDOUT_FILENO);
+		assert(fd);
+	}
+
+	return PipeEnd(fd, null, false);
 }
 
-File stderr() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEnd getStderr() @property // @suppress(dscanner.confusing.function_attributes)
 {
-	return File(STDERR_FILENO, null);
+	int fd;
+	version (Posix)
+	{
+		import core.sys.posix.unistd : dup;
+
+		fd = dup(STDERR_FILENO);
+		assert(fd);
+	}
+
+	return PipeEnd(fd, null, false);
 }

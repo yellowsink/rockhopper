@@ -23,12 +23,23 @@ void main()
 {
 	entrypoint({
 
-		import rockhopper.rhapi.file : stdout;
+		import rockhopper.rhapi.file : getStdout, Pipe;
 		import std.string : representation;
 		import eventcore.driver : IOStatus;
 
-		stdout.rawWrite(0, representation("hiiiiii :3"));
+		/* // TODO: debug issues
+		auto stdout = getStdout();
 
+		getStdout.rawWrite(representation("hiiiiii :3\n"));
+
+		getStdout.rawWrite(representation("hiiiiii :3\n")); */
+
+		auto p = Pipe.create();
+		p.writeEnd.rawWrite(representation("yo!"));
+
+		ubyte[3] buf;
+		p.readEnd.rawRead(buf);
+		writeln(buf);
 
 	});
 }
