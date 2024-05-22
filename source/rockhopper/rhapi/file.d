@@ -1,6 +1,7 @@
 module rockhopper.rhapi.file;
 
-import rockhopper;
+import rockhopper.core.reactor;
+import rockhopper.core.uda;
 
 public import eventcore.driver : FileOpenMode;
 
@@ -34,6 +35,13 @@ DEALINGS IN THE SOFTWARE.
 
  */
 
+// a quick note on types
+// int / HANDLE  system FD or handle
+// FILE* C       stdio.h streams <-- *THIS IS A RED HERRING, RESIST THE URGE TO USE THIS HERE*
+// phobos file   wraps a FILE*
+// FileFD        wraps an int / HANDLE
+// rh File       wraps a FileFD
+
 // note: unlike sync, this *is* copyable via refcounting
 // modelled after the implementation of phobos/std/stdio.d/File
 struct File
@@ -42,11 +50,11 @@ struct File
 
 	import core.memory : pureMalloc, pureFree;
 	import core.atomic : atomicStore, atomicLoad, atomicOp;
-	import std.stdio : FILE;
 	import eventcore.core : eventDriver;
-	import eventcore.driver : FileFD, OpenStatus;
+	import eventcore.driver : FileFD, OpenStatus, IOStatus;
 
 	import rockhopper.core.llevents : fileOpen, fileClose, fileRead, fileWrite;
+	import rockhopper.rhapi.syncf : FMutex; // TODO: TMutex
 
 	// === STORAGE ===
 
@@ -55,19 +63,18 @@ struct File
 		FileFD fd; // null if another instance closes this file
 		shared uint refCount;
 		bool noAutoClose; // if true, never close automatically
+		FMutex mutex;
+
 	}
 	private Impl* _impl;
-	private string _name;
+	private string _name; // TODO: remove this
 
 	// === CONSTRUCTORS ===
 
-	/* this(FILE* handle, string name, uint refs = 1, bool noAutoClose = false) nothrow
+	this(int handle, string name, uint refs = 1, bool noAutoClose = false) nothrow
 	{
-		// TODO: is this correct?
-		auto fd = eventDriver.files.adopt(cast(int) handle);
-
-		initialize(fd, name, refs, noAutoClose);
-	} */
+		initialize(eventDriver.files.adopt(handle), name, refs, noAutoClose);
+	}
 
 	this(FileFD handle, string name, uint refs = 1, bool noAutoClose = false) @nogc nothrow
 	{
@@ -88,9 +95,9 @@ struct File
 	}
 
 	// i've checked, async *struct* constructors are safe!
-	this(string name, FileOpenMode mode) @trusted
+	this(string name, FileOpenMode mode) @trusted @Async
 	{
-		auto fd = fileOpen(name, mode); // ASYNC
+		auto fd = fileOpen(name, mode);
 		assert(fd.status == OpenStatus.ok);
 
 		initialize(fd.fd, name);
@@ -126,7 +133,7 @@ struct File
 	// === FILE OPERATIONS ===
 
 	// replaces the currently open file of this instance with a new one
-	void open(string name, FileOpenMode mode) @trusted
+	void open(string name, FileOpenMode mode) @trusted @Async
 	{
 		if (_impl !is null)
 			detach(); // if this instance points to a file, detach
@@ -137,18 +144,9 @@ struct File
 		initialize(opened.fd, name);
 	}
 
-	// unimplemented.
-	// void reopen(string name, FileOpenMode mode)
-
 	// need to check fd because will be null if another instance closed the file.
 	@property bool isOpen() const pure nothrow
 		=> _impl !is null && _impl.fd;
-
-	@property string name() const pure nothrow return
-		=> _name;
-
-	// unimplemented
-	// @property error() const @trusted pure nothrow
 
 	// if open closes, else does nothing
 	void close() @trusted
@@ -164,13 +162,10 @@ struct File
 		}
 
 		if (!_impl.fd) return; // already closed on another thread
-		scope(exit) _impl.fd = null; // why not
+		scope(exit) _impl.fd = typeof(_impl.fd).init; // why not
 
 		eventDriver.files.releaseRef(_impl.fd); // close
 	}
-
-	// unimplemented - flushing is not necessary with ec
-	// void flush()
 
 	void sync() @trusted
 	{
@@ -184,14 +179,28 @@ struct File
 
 	// TODO: actual I/O apis
 
-	FILE* getFP() @safe pure
+	@property int fileno() const @trusted
 	{
-		assert(_impl && _impl.fd);
-		return _impl.fd; // TODO: FileFD -> FILE*?
+		auto fd = _impl.fd.value.value;
+		assert(fd < int.max);
+		return cast(int) fd;
 	}
 
-	@property fileno_t fileno() const @trusted
+	ulong rawRead(ulong oset, ubyte[] buf) @trusted @Async
 	{
-		return .fileno(getFP); // TODO: is this correct?
+		_impl.mutex.lock();
+		auto res = fileRead(_impl.fd, oset, buf);
+		_impl.mutex.unlock();
+		assert(res.status == IOStatus.ok); // TODO: good error handling
+		return res.bytesRWd;
+	}
+
+	ulong rawWrite(ulong oset, const(ubyte)[] buf) @trusted @Async
+	{
+		_impl.mutex.lock();
+		auto res = fileWrite(_impl.fd, oset, buf);
+		_impl.mutex.unlock();
+		assert(res.status == IOStatus.ok);
+		return res.bytesRWd;
 	}
 }

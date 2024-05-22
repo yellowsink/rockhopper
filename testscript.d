@@ -45,6 +45,8 @@ void main()
 		f = File("testscript.d", FileOpenMode.read); // async construction!
 		done = true;
 
+		writeln(f.fileno);
+
 	});
 }
 

@@ -27,7 +27,10 @@ public {
 	}
 
 	// Fiber.yield() for convenience
-	void yield() @Async => Fiber.yield();
+	void yield() @Async
+	{
+		Fiber.yield();
+	}
 
 	// return type must be the same as WrappedFiber.suspendResult
 	// This function informs the reactor to pause your fiber and potentially entire thread on the given suspend.
