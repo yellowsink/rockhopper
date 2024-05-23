@@ -28,9 +28,8 @@ void main()
 		import std.socket : parseAddress;
 		import eventcore.driver : ConnectStatus, IOStatus;
 
-		File("test.txt", FileOpenMode.append)
-			.rawWrite(0, representation("uh oh"))
-			.writeln;
+		//FileH("testscript.d", FileOpenMode.read)
+		getStdout.handle.write("test".representation);
 	});
 }
 
