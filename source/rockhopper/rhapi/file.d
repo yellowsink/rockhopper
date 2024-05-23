@@ -121,6 +121,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 	{
 		assert(!_impl);
 		_impl = cast(Impl*) pureMalloc(Impl.sizeof);
+		*_impl = Impl.init; // overwrite uninitialized memory from malloc!
 		assert(_impl);
 
 

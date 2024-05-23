@@ -25,14 +25,12 @@ void main()
 
 		import rockhopper.rhapi.file;
 		import std.string : representation, assumeUTF;
+		import std.socket : parseAddress;
+		import eventcore.driver : ConnectStatus, IOStatus;
 
-		auto p = Pipe.create();
-		p.writeEnd.rawWrite(representation("yo!"));
-
-		ubyte[3] buf;
-		p.readEnd.rawRead(buf);
-		writeln(assumeUTF(buf));
-
+		File("test.txt", FileOpenMode.append)
+			.rawWrite(0, representation("uh oh"))
+			.writeln;
 	});
 }
 
