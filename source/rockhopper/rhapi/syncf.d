@@ -85,10 +85,30 @@ struct FSemaphore
 }
 
 
+// non-recursive mutex, can only have one lock at all even from the same fiber
+struct FMutex
+{
+	@disable this(ref FMutex);
+
+	private bool locked;
+
+	void lock() @Async
+	{
+		while (locked) yield();
+		locked = true;
+	}
+
+	void unlock()
+	{
+		assert(locked, "unlocking an unlocked FMutex makes no sense");
+		locked = false;
+	}
+}
+
 // core.sync.mutex : Mutex
 // this is a recursive mutex - the SAME FIBER ONLY can call lock() multiple times without deadlocking
 // two fibers however still cannot hold a lock at once.
-struct FMutex
+struct FReMutex
 {
 	@disable this(ref FMutex); // see FEvent::this(ref FEvent)
 
@@ -192,18 +212,13 @@ template fSynchronized(alias func)
 	// and nobody needs that, so just be satisfied with the assert.
 	static if(isSomeFunction!func)
 	{
-		// TODO: can't use fmutex as it is reentrant
-		// FMutex m;
-		bool busy;
+		FMutex m;
 
 		ReturnType!func fSynchronized(Parameters!func args) @Async
 		{
-			while (busy) yield();
-			busy = true;
-			//m.lock();
+			m.lock();
 			func(args);
-			//m.unlock();
-			busy = false;
+			m.unlock();
 		}
 	}
 } // i learned templates from scratch for this, and i'm proud of the result :) -- sink

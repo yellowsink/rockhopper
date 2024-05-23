@@ -110,6 +110,19 @@ struct FMutex
 }
 ```
 
+A basic mutex. Only one lock can be held at a time. Trying to lock a locked mutex will wait for it to be unlocked.
+This mutex is NOT re-entrant - see `FReMutex`.
+
+## `FReMutex`
+
+```d
+struct FReMutex
+{
+	void lock(); [ASYNC]
+	void unlock();
+}
+```
+
 This is a *recursive* (re-entrant) mutex. It is either locked or unlocked, and when a fiber `lock`s it, any other fibers
 trying to lock it will be suspended until the locking fiber `unlock`s it.
 

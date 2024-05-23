@@ -24,8 +24,7 @@ void main()
 	entrypoint({
 
 		import rockhopper.rhapi.file : getStdout, Pipe;
-		import std.string : representation;
-		import eventcore.driver : IOStatus;
+		import std.string : representation, assumeUTF;
 
 		auto stdout = getStdout();
 
@@ -38,7 +37,7 @@ void main()
 
 		ubyte[3] buf;
 		p.readEnd.rawRead(buf);
-		writeln(buf);
+		writeln(assumeUTF(buf));
 
 	});
 }
