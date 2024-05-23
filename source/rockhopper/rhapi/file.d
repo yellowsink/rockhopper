@@ -75,8 +75,6 @@ private void check(alias OK, alias TEM)(typeof(OK) v)
 // if pipe, then reads and writes will not accept offsets etc. use the appropriate one for your FD type
 private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITEABLE = true)
 {
-@safe:
-
 	import std.meta : AliasSeq;
 	import core.memory : pureMalloc, pureFree;
 	import core.atomic : atomicStore, atomicLoad, atomicOp;
@@ -119,7 +117,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 		initialize(handle, noAutoClose, refs);
 	}
 
-	private void initialize(FD handle, bool noAutoClose = false, uint refs = 1) @nogc nothrow @trusted
+	private void initialize(FD handle, bool noAutoClose = false, uint refs = 1) @nogc nothrow
 	{
 		assert(!_impl);
 		_impl = cast(Impl*) pureMalloc(Impl.sizeof);
@@ -133,7 +131,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 
 	// i've checked, async *struct* constructors are safe!
 	static if (!IS_PIPE)
-	this(string name, FileOpenMode mode) @trusted @Async
+	this(string name, FileOpenMode mode) @Async
 	{
 		auto fd = fileOpen(name, mode);
 		check!(OpenStatus.ok, (s) => "open failed: " ~ s)(fd.status);
@@ -174,7 +172,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 	~this() => detach();
 
 	// -1 refcount & free & close
-	void detach() @trusted
+	void detach()
 	{
 		if (!_impl) return;
 		scope(exit) _impl = null;
@@ -188,11 +186,20 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 		}
 	}
 
+	// === INTERNAL UTILS ===
+
+	private T withLock(T)(T delegate() f)
+	{
+		_impl.mutex.lock();
+		scope(exit) _impl.mutex.unlock();
+		return f();
+	}
+
 	// === FILE OPERATIONS ===
 
 	// replaces the currently open file of this instance with a new one
 	static if (!IS_PIPE)
-	void open(string name, FileOpenMode mode) @trusted @Async
+	void open(string name, FileOpenMode mode) @Async
 	{
 		detach(); // if this instance points to a file, detach
 
@@ -208,7 +215,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 		=> _impl !is null && _impl.fd;
 
 	// if open, closes, else does nothing
-	void close() @trusted
+	void close()
 	{
 		if (!_impl) return;
 
@@ -227,7 +234,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 	}
 
 	static if (!IS_PIPE)
-	void sync() @trusted
+	void sync()
 	{
 		// TODO: Windows support
 		// TODO: Darwin support
@@ -237,7 +244,7 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 		errnoEnforce(fsync(fileno) == 0);
 	}
 
-	@property int fileno() const @trusted
+	@property int fileno() const
 	{
 		auto fd = _impl.fd.value.value;
 		assert(fd < int.max);
@@ -251,33 +258,31 @@ private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITE
 		private alias OFFSET_ARGS = AliasSeq!ulong;
 
 	static if (READABLE)
-	ulong rawRead(OFFSET_ARGS oset, ubyte[] buf) @trusted @Async
+	ulong rawRead(OFFSET_ARGS oset, ubyte[] buf) @Async
 	{
-		_impl.mutex.lock();
+		return withLock({
+			static if (IS_PIPE)
+				auto res = pipeRead(_impl.fd, buf);
+			else
+				auto res = fileRead(_impl.fd, oset[0], buf);
 
-		static if (IS_PIPE)
-			auto res = pipeRead(_impl.fd, buf);
-		else
-			auto res = fileRead(_impl.fd, oset[0], buf);
-
-		_impl.mutex.unlock();
-		check!(IOStatus.ok, (s) => "read error: " ~ s)(res.status);
-		return res.bytesRWd;
+			check!(IOStatus.ok, (s) => "read error: " ~ s)(res.status);
+			return res.bytesRWd;
+		});
 	}
 
 	static if (WRITEABLE)
-	ulong rawWrite(OFFSET_ARGS oset, const(ubyte)[] buf) @trusted @Async
+	ulong rawWrite(OFFSET_ARGS oset, const(ubyte)[] buf) @Async
 	{
-		_impl.mutex.lock();
+		return withLock({
+			static if (IS_PIPE)
+				auto res = pipeWrite(_impl.fd, buf);
+			else
+				auto res = fileWrite(_impl.fd, oset[0], buf);
 
-		static if (IS_PIPE)
-			auto res = pipeWrite(_impl.fd, buf);
-		else
-			auto res = fileWrite(_impl.fd, oset[0], buf);
-
-		_impl.mutex.unlock();
-		check!(IOStatus.ok, (s) => "write error: " ~ s)(res.status);
-		return res.bytesRWd;
+			check!(IOStatus.ok, (s) => "write error: " ~ s)(res.status);
+			return res.bytesRWd;
+		});
 	}
 }
 
@@ -294,12 +299,12 @@ struct Pipe
 	private PipeEndRead _read;
 	private PipeEndWrite _write;
 
-	@property PipeEndRead readEnd() @safe nothrow { return _read; }
-	@property PipeEndWrite writeEnd() @safe nothrow { return _write; }
+	@property PipeEndRead readEnd() nothrow { return _read; }
+	@property PipeEndWrite writeEnd() nothrow { return _write; }
 
 	// generally should be unnecessary, as both pipes will automatically close themselves when
 	// there are no more references to them
-	void close() @safe
+	void close()
 	{
 		_read.close();
 		_write.close();

@@ -27,7 +27,11 @@ void main()
 		import std.string : representation, assumeUTF;
 
 		auto p = Pipe.create();
-		PipeEndWrite(PipeEndAny(p.readEnd)).rawWrite(representation("yo!"));
+		p.writeEnd.rawWrite(representation("yo!"));
+
+		ubyte[3] buf;
+		p.readEnd.rawRead(buf);
+		writeln(assumeUTF(buf));
 
 	});
 }
