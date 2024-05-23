@@ -16,6 +16,9 @@
 - Prevent unlocking an FMutex from a fiber that does not hold it
 - Add `@Async` and `@ThreadSafe` UDAs
 - Basic implementation of `rhapi.file.File` for safer use of file I/O
+  * with support for pipes (`PipeEnd` & `Pipe`)
+  * stdin/out/err pipe ends easy to access correctly
+- Rename `FMutex` to `FReMutex`, and make `FMutex` a new NON-recursive mutex
 
 ## `0.0.1-beta.1`
 
