@@ -103,18 +103,27 @@ private struct FileOrPipe(bool IS_PIPE = false)
 		FD fd; // null if another instance closes this file
 		shared uint refCount;
 		bool noAutoClose; // if true, never close automatically
-		FMutex mutex;
-
+		// FMutex is re-entrant which is a problem here.
+		bool locked;
 	}
 	private Impl* _impl;
 	private string _name; // TODO: remove this
+
+	private void lock() @trusted
+	{
+		while (_impl.locked) yield();
+		_impl.locked = true;
+	}
+
+	private void unlock() @safe
+	{
+		_impl.locked = false;
+	}
 
 	// === CONSTRUCTORS ===
 
 	this(int handle, string name, bool noAutoClose = true, uint refs = 1) nothrow
 	{
-		import std.stdio : writeln;
-		try { writeln("constructed fd ", handle); } catch (Exception) {}
 		initialize(driverfp().adopt(handle), name, noAutoClose, refs);
 	}
 
@@ -165,9 +174,6 @@ private struct FileOrPipe(bool IS_PIPE = false)
 	{
 		if (!_impl) return;
 		scope(exit) _impl = null;
-
-		import std.stdio : writeln;
-		try { writeln("detached from fd ", _impl.fd); } catch (Throwable) {}
 
 		if (atomicOp!"-="(_impl.refCount, 1) == 0)
 		{
@@ -246,34 +252,28 @@ private struct FileOrPipe(bool IS_PIPE = false)
 
 	ulong rawRead(OFFSET_ARGS oset, ubyte[] buf) @trusted @Async
 	{
-		import std.stdio : writeln;
-		writeln("read from fd ", _impl.fd);
-
-		_impl.mutex.lock();
+		lock();
 
 		static if (IS_PIPE)
 			auto res = pipeRead(_impl.fd, buf);
 		else
 			auto res = fileRead(_impl.fd, oset[0], buf);
 
-		_impl.mutex.unlock();
+		unlock();
 		check!(IOStatus.ok, (s) => "read error: " ~ s)(res.status);
 		return res.bytesRWd;
 	}
 
 	ulong rawWrite(OFFSET_ARGS oset, const(ubyte)[] buf) @trusted @Async
 	{
-		import std.stdio : writeln;
-		writeln("write from fd ", _impl.fd);
-
-		_impl.mutex.lock();
+		lock();
 
 		static if (IS_PIPE)
 			auto res = pipeWrite(_impl.fd, buf);
 		else
 			auto res = fileWrite(_impl.fd, oset[0], buf);
 
-		_impl.mutex.unlock();
+		unlock();
 		check!(IOStatus.ok, (s) => "write error: " ~ s)(res.status);
 		return res.bytesRWd;
 	}
@@ -287,8 +287,8 @@ alias PipeEnd = FileOrPipe!true;
 // wraps a complete pipe with a read and write end
 struct Pipe
 {
-	PipeEnd _read;
-	PipeEnd _write;
+	private PipeEnd _read;
+	private PipeEnd _write;
 
 	@property PipeEnd readEnd() @safe nothrow { return _read; }
 	@property PipeEnd writeEnd() @safe nothrow { return _write; }
@@ -312,10 +312,7 @@ struct Pipe
 			int[2] fds;
 			check!(0, (_) => "failed to open pipe")(pipe(fds));
 
-			Pipe p;
-			p._read = PipeEnd(fds[0], null);
-			p._write = PipeEnd(fds[1], null);
-			return p;
+			return Pipe(PipeEnd(fds[0], null, false), PipeEnd(fds[1], null, false));
 		}
 		else
 		{

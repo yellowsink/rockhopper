@@ -27,12 +27,11 @@ void main()
 		import std.string : representation;
 		import eventcore.driver : IOStatus;
 
-		/* // TODO: debug issues
 		auto stdout = getStdout();
 
 		getStdout.rawWrite(representation("hiiiiii :3\n"));
 
-		getStdout.rawWrite(representation("hiiiiii :3\n")); */
+		getStdout.rawWrite(representation("hiiiiii :3\n"));
 
 		auto p = Pipe.create();
 		p.writeEnd.rawWrite(representation("yo!"));

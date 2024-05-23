@@ -192,13 +192,18 @@ template fSynchronized(alias func)
 	// and nobody needs that, so just be satisfied with the assert.
 	static if(isSomeFunction!func)
 	{
-		FMutex m;
+		// TODO: can't use fmutex as it is reentrant
+		// FMutex m;
+		bool busy;
 
 		ReturnType!func fSynchronized(Parameters!func args) @Async
 		{
-			m.lock();
+			while (busy) yield();
+			busy = true;
+			//m.lock();
 			func(args);
-			m.unlock();
+			//m.unlock();
+			busy = false;
 		}
 	}
 } // i learned templates from scratch for this, and i'm proud of the result :) -- sink
