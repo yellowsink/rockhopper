@@ -26,12 +26,6 @@ void main()
 		import rockhopper.rhapi.file : getStdout, Pipe;
 		import std.string : representation, assumeUTF;
 
-		auto stdout = getStdout();
-
-		getStdout.rawWrite(representation("hiiiiii :3\n"));
-
-		getStdout.rawWrite(representation("hiiiiii :3\n"));
-
 		auto p = Pipe.create();
 		p.writeEnd.rawWrite(representation("yo!"));
 

@@ -106,21 +106,20 @@ private struct FileOrPipe(bool IS_PIPE = false)
 		FMutex mutex;
 	}
 	private Impl* _impl;
-	private string _name; // TODO: remove this
 
 	// === CONSTRUCTORS ===
 
-	this(int handle, string name, bool noAutoClose = true, uint refs = 1) nothrow
+	this(int handle, bool noAutoClose = true, uint refs = 1) nothrow
 	{
-		initialize(driverfp().adopt(handle), name, noAutoClose, refs);
+		initialize(driverfp().adopt(handle), noAutoClose, refs);
 	}
 
-	this(FD handle, string name, bool noAutoClose = true, uint refs = 1) @nogc nothrow
+	this(FD handle, bool noAutoClose = true, uint refs = 1) @nogc nothrow
 	{
-		initialize(handle, name, noAutoClose, refs);
+		initialize(handle, noAutoClose, refs);
 	}
 
-	private void initialize(FD handle, string name, bool noAutoClose = false, uint refs = 1) @nogc nothrow @trusted
+	private void initialize(FD handle, bool noAutoClose = false, uint refs = 1) @nogc nothrow @trusted
 	{
 		assert(!_impl);
 		_impl = cast(Impl*) pureMalloc(Impl.sizeof);
@@ -130,7 +129,6 @@ private struct FileOrPipe(bool IS_PIPE = false)
 		_impl.fd = handle;
 		_impl.noAutoClose = noAutoClose;
 		atomicStore(_impl.refCount, refs);
-		_name = name;
 	}
 
 	// i've checked, async *struct* constructors are safe!
@@ -141,7 +139,7 @@ private struct FileOrPipe(bool IS_PIPE = false)
 			auto fd = fileOpen(name, mode);
 			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(fd.status);
 
-			initialize(fd.fd, name);
+			initialize(fd.fd);
 		}
 	}
 
@@ -185,7 +183,7 @@ private struct FileOrPipe(bool IS_PIPE = false)
 			// if this fails, leaves the file with no _impl attached cleanly.
 			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(opened.status);
 
-			initialize(opened.fd, name);
+			initialize(opened.fd);
 		}
 	}
 
@@ -300,7 +298,7 @@ struct Pipe
 			int[2] fds;
 			check!(0, (_) => "failed to open pipe")(pipe(fds));
 
-			return Pipe(PipeEnd(fds[0], null, false), PipeEnd(fds[1], null, false));
+			return Pipe(PipeEnd(fds[0], false), PipeEnd(fds[1], false));
 		}
 		else
 		{
@@ -322,7 +320,7 @@ PipeEnd getStdin() @property // @suppress(dscanner.confusing.function_attributes
 		assert(fd);
 	}
 
-	return PipeEnd(fd, null, false);
+	return PipeEnd(fd, false);
 }
 
 PipeEnd getStdout() @property // @suppress(dscanner.confusing.function_attributes)
@@ -336,7 +334,7 @@ PipeEnd getStdout() @property // @suppress(dscanner.confusing.function_attribute
 		assert(fd);
 	}
 
-	return PipeEnd(fd, null, false);
+	return PipeEnd(fd, false);
 }
 
 PipeEnd getStderr() @property // @suppress(dscanner.confusing.function_attributes)
@@ -350,5 +348,5 @@ PipeEnd getStderr() @property // @suppress(dscanner.confusing.function_attribute
 		assert(fd);
 	}
 
-	return PipeEnd(fd, null, false);
+	return PipeEnd(fd, false);
 }
