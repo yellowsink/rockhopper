@@ -23,15 +23,11 @@ void main()
 {
 	entrypoint({
 
-		import rockhopper.rhapi.file : getStdout, Pipe;
+		import rockhopper.rhapi.file;
 		import std.string : representation, assumeUTF;
 
 		auto p = Pipe.create();
-		p.writeEnd.rawWrite(representation("yo!"));
-
-		ubyte[3] buf;
-		p.readEnd.rawRead(buf);
-		writeln(assumeUTF(buf));
+		PipeEndWrite(PipeEndAny(p.readEnd)).rawWrite(representation("yo!"));
 
 	});
 }

@@ -73,7 +73,7 @@ private void check(alias OK, alias TEM)(typeof(OK) v)
 // copyable via refcounting, auto closes on last detach
 // modelled after the implementation of phobos/std/stdio.d/File
 // if pipe, then reads and writes will not accept offsets etc. use the appropriate one for your FD type
-private struct FileOrPipe(bool IS_PIPE = false)
+private struct FileOrPipe(bool IS_PIPE = false, bool READABLE = true, bool WRITEABLE = true)
 {
 @safe:
 
@@ -133,13 +133,31 @@ private struct FileOrPipe(bool IS_PIPE = false)
 
 	// i've checked, async *struct* constructors are safe!
 	static if (!IS_PIPE)
+	this(string name, FileOpenMode mode) @trusted @Async
 	{
-		this(string name, FileOpenMode mode) @trusted @Async
-		{
-			auto fd = fileOpen(name, mode);
-			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(fd.status);
+		auto fd = fileOpen(name, mode);
+		check!(OpenStatus.ok, (s) => "open failed: " ~ s)(fd.status);
 
-			initialize(fd.fd);
+		initialize(fd.fd);
+	}
+
+	// copy constructors between pipes of different types
+	static if (IS_PIPE)
+	{
+		this(P)(scope P rhs)
+		if (
+			// pipew and piper -> pipea
+			(WRITEABLE && READABLE && (is(P == FileOrPipe!(true, true, false)) || is(P == FileOrPipe!(true, false, true))))
+			// pipea -> pipew
+			|| (WRITEABLE && !READABLE && is(P == FileOrPipe!true))
+			// pipea -> piper
+			|| (!WRITEABLE && READABLE && is(P == FileOrPipe!true))
+		)
+		{
+			if (!rhs._impl) return;
+			assert(atomicLoad(rhs._impl.refCount));
+			atomicOp!"+="(rhs._impl.refCount, 1); // add a ref
+			_impl = cast(Impl*) rhs._impl; // duplicate the impl pointer
 		}
 	}
 
@@ -174,17 +192,15 @@ private struct FileOrPipe(bool IS_PIPE = false)
 
 	// replaces the currently open file of this instance with a new one
 	static if (!IS_PIPE)
+	void open(string name, FileOpenMode mode) @trusted @Async
 	{
-		void open(string name, FileOpenMode mode) @trusted @Async
-		{
-			detach(); // if this instance points to a file, detach
+		detach(); // if this instance points to a file, detach
 
-			auto opened = fileOpen(name, mode);
-			// if this fails, leaves the file with no _impl attached cleanly.
-			check!(OpenStatus.ok, (s) => "open failed: " ~ s)(opened.status);
+		auto opened = fileOpen(name, mode);
+		// if this fails, leaves the file with no _impl attached cleanly.
+		check!(OpenStatus.ok, (s) => "open failed: " ~ s)(opened.status);
 
-			initialize(opened.fd);
-		}
+		initialize(opened.fd);
 	}
 
 	// need to check fd because will be null if another instance closed the file.
@@ -211,16 +227,14 @@ private struct FileOrPipe(bool IS_PIPE = false)
 	}
 
 	static if (!IS_PIPE)
+	void sync() @trusted
 	{
-		void sync() @trusted
-		{
-			// TODO: Windows support
-			// TODO: Darwin support
-			import core.sys.posix.unistd : fsync;
-			import std.exception : errnoEnforce;
+		// TODO: Windows support
+		// TODO: Darwin support
+		import core.sys.posix.unistd : fsync;
+		import std.exception : errnoEnforce;
 
-			errnoEnforce(fsync(fileno) == 0);
-		}
+		errnoEnforce(fsync(fileno) == 0);
 	}
 
 	@property int fileno() const @trusted
@@ -236,6 +250,7 @@ private struct FileOrPipe(bool IS_PIPE = false)
 	else
 		private alias OFFSET_ARGS = AliasSeq!ulong;
 
+	static if (READABLE)
 	ulong rawRead(OFFSET_ARGS oset, ubyte[] buf) @trusted @Async
 	{
 		_impl.mutex.lock();
@@ -250,6 +265,7 @@ private struct FileOrPipe(bool IS_PIPE = false)
 		return res.bytesRWd;
 	}
 
+	static if (WRITEABLE)
 	ulong rawWrite(OFFSET_ARGS oset, const(ubyte)[] buf) @trusted @Async
 	{
 		_impl.mutex.lock();
@@ -268,16 +284,18 @@ private struct FileOrPipe(bool IS_PIPE = false)
 // wraps a file handle
 alias File = FileOrPipe!false;
 // wraps one end of a pipe handle
-alias PipeEnd = FileOrPipe!true;
+alias PipeEndRead = FileOrPipe!(true, true, false);
+alias PipeEndWrite = FileOrPipe!(true, false);
+alias PipeEndAny = FileOrPipe!true;
 
 // wraps a complete pipe with a read and write end
 struct Pipe
 {
-	private PipeEnd _read;
-	private PipeEnd _write;
+	private PipeEndRead _read;
+	private PipeEndWrite _write;
 
-	@property PipeEnd readEnd() @safe nothrow { return _read; }
-	@property PipeEnd writeEnd() @safe nothrow { return _write; }
+	@property PipeEndRead readEnd() @safe nothrow { return _read; }
+	@property PipeEndWrite writeEnd() @safe nothrow { return _write; }
 
 	// generally should be unnecessary, as both pipes will automatically close themselves when
 	// there are no more references to them
@@ -298,7 +316,7 @@ struct Pipe
 			int[2] fds;
 			check!(0, (_) => "failed to open pipe")(pipe(fds));
 
-			return Pipe(PipeEnd(fds[0], false), PipeEnd(fds[1], false));
+			return Pipe(PipeEndRead(fds[0], false), PipeEndWrite(fds[1], false));
 		}
 		else
 		{
@@ -309,7 +327,7 @@ struct Pipe
 
 import core.sys.posix.unistd : STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO;
 
-PipeEnd getStdin() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEndRead getStdin() @property // @suppress(dscanner.confusing.function_attributes)
 {
 	int fd;
 	// TODO: other platforms than POSIX
@@ -320,10 +338,10 @@ PipeEnd getStdin() @property // @suppress(dscanner.confusing.function_attributes
 		assert(fd);
 	}
 
-	return PipeEnd(fd, false);
+	return PipeEndRead(fd, false);
 }
 
-PipeEnd getStdout() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEndWrite getStdout() @property // @suppress(dscanner.confusing.function_attributes)
 {
 	int fd;
 	version (Posix)
@@ -334,10 +352,10 @@ PipeEnd getStdout() @property // @suppress(dscanner.confusing.function_attribute
 		assert(fd);
 	}
 
-	return PipeEnd(fd, false);
+	return PipeEndWrite(fd, false);
 }
 
-PipeEnd getStderr() @property // @suppress(dscanner.confusing.function_attributes)
+PipeEndWrite getStderr() @property // @suppress(dscanner.confusing.function_attributes)
 {
 	int fd;
 	version (Posix)
@@ -348,5 +366,5 @@ PipeEnd getStderr() @property // @suppress(dscanner.confusing.function_attribute
 		assert(fd);
 	}
 
-	return PipeEnd(fd, false);
+	return PipeEndWrite(fd, false);
 }
