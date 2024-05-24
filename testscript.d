@@ -28,8 +28,19 @@ void main()
 		import std.socket : parseAddress;
 		import eventcore.driver : ConnectStatus, IOStatus;
 
-		//FileH("testscript.d", FileOpenMode.read)
-		getStdout.handle.write("test".representation);
+		auto s = streamify(FileH("testscript.d", FileOpenMode.read));
+		for (;;)
+		{
+			/* ubyte[128] buf;
+			auto xfered = s.rawRead(buf); */
+			auto buf = s.rawRead(128);
+			writefln("xfered: %d, eof: %b", buf.length, s.isEof);
+
+			if (s.isEof)
+				writeln("last buffer: ", buf);
+
+			if (s.isEof) break;
+		}
 	});
 }
 

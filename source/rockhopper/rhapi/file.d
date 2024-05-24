@@ -287,8 +287,8 @@ struct Pipe
 	@property PipeEndHR readEnd() nothrow { return _read; }
 	@property PipeEndHW writeEnd() nothrow { return _write; }
 
-	@property auto readStream() nothrow { return readStreamify(_read); }
-	@property auto writeStream() nothrow { return writeStreamify(_write); }
+	@property auto readStream() nothrow { return streamify(_read); }
+	@property auto writeStream() nothrow { return streamify(_write); }
 
 	// generally should be unnecessary, as both pipes will automatically close themselves when
 	// there are no more references to them
@@ -325,27 +325,44 @@ enum SeekOrigin
 	end
 }
 
-// assumes you already have a `H handle` in your struct
-mixin template StreamIndexManagement()
+struct Stream(H) if (isInstanceOf!(Handle, H))
 {
-	private ulong _index;
-	private bool _eof;
+	H handle;
 
-	@property ulong tell() const { return _index; }
+	enum isSeekable = !H.isPipe;
+	enum isReadable = H.isReadable;
+	enum isWriteable = H.isWriteable;
 
-	// forward length from handle for convenience
-	@property ulong length() const { return handle.length; }
-
-	@property bool isEof() const { return _eof; }
-
-	void seek(long oset, SeekOrigin origin = SeekOrigin.set)
+	// position management
+	static if (isSeekable)
 	{
-		import std.exception : enforce;
+		private ulong _index;
+		private bool _eof;
 
-		auto len = length;
-
-		final switch (origin) with(SeekOrigin)
+		@property ulong tell() const
 		{
+			return _index;
+		}
+
+		// forward length from handle for convenience
+		@property ulong length() const
+		{
+			return handle.length;
+		}
+
+		@property bool isEof() const
+		{
+			return _eof;
+		}
+
+		void seek(long oset, SeekOrigin origin = SeekOrigin.set)
+		{
+			import std.exception : enforce;
+
+			auto len = length;
+
+			final switch (origin) with (SeekOrigin)
+			{
 			case set:
 				enforce(oset < len, "cannot seek past the end of the stream");
 				_index = oset;
@@ -361,48 +378,80 @@ mixin template StreamIndexManagement()
 				enforce(oset <= 0, "cannot seek past the end of the stream");
 				_index = len + oset;
 				break;
+			}
+
+			checkEOF(len);
 		}
 
-		checkEOF(len);
+		private void checkEOF()
+		{
+			checkEOF(length);
+		}
+
+		private void checkEOF(ulong l)
+		{
+			_eof = _index == l;
+		}
 	}
 
-	private void checkEOF()
+	static if (isReadable)
+	// reads into a buffer, updating the index and eof state as necessary, returning the amount written
+	ulong rawRead(ubyte[] buffer) @Async
 	{
-		checkEOF(length);
+		ulong bytesXfered;
+
+		// we only check if this read will EOF using the file length if an error occurs,
+		// as checking length() every time would be relatively expensive.
+		try
+		{
+			static if (isSeekable)
+				bytesXfered = handle.read(_index, buffer);
+			else
+				bytesXfered = handle.read(buffer);
+		}
+		catch (FileIOException e)
+		{
+			// can only check for eof with a seekable stream.
+			static if (isSeekable)
+			{
+				auto fileLen = length();
+
+				if (
+					// error state MIGHT BE an EOF
+					e.status == IOStatus.error // this read indeed would have EOFed
+					&& _index + buffer.length > fileLen)
+					{
+					bytesXfered = fileLen - _index;
+					_eof = true;
+				}
+				else
+					throw e;
+			}
+			else throw e;
+		}
+
+		static if (isSeekable)
+			_index += bytesXfered;
+
+		return bytesXfered;
 	}
 
-	private void checkEOF(ulong l)
+	static if (isReadable)
+	ubyte[] rawRead(ulong upTo) @Async
 	{
-		_eof = _index == l;
+		ubyte[] buf = new ubyte[upTo];
+		auto xfered = rawRead(buf);
+		return buf[0 .. xfered];
 	}
-}
 
-struct ReadStream(H) if (isInstanceOf!(Handle, H) && H.isReadable)
-{
-	H handle;
-
-	// position management
-	static if (!H.isPipe) mixin StreamIndexManagement!();
-
-	// TODO: actually implement
-}
-
-struct WriteStream(H) if (isInstanceOf!(Handle, H) && H.isWriteable)
-{
-	H handle;
-
-	// position management
-	static if (!H.isPipe) mixin StreamIndexManagement!();
+	// TODO: rawWrite
+	// TODO: nice apis
 }
 
 // this sucks but idk what else to do because of template arg inference
-auto readStreamify(H)(scope H value) if (isInstanceOf!(Handle, H) && H.isReadable)
+auto streamify(H)(scope H value) if (isInstanceOf!(Handle, H))
 {
-	return ReadStream!H(value);
-}
-auto writeStreamify(H)(scope H value) if (isInstanceOf!(Handle, H) && H.isWriteable)
-{
-	return WriteStream!H(value);
+	return Stream!H(value);
 }
 
 import core.sys.posix.unistd : STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO;
@@ -418,7 +467,7 @@ auto getStdin() @property // @suppress(dscanner.confusing.function_attributes)
 		assert(fd);
 	}
 
-	return readStreamify(PipeEndHR(fd, false));
+	return streamify(PipeEndHR(fd, false));
 }
 
 auto getStdout() @property // @suppress(dscanner.confusing.function_attributes)
@@ -432,7 +481,7 @@ auto getStdout() @property // @suppress(dscanner.confusing.function_attributes)
 		assert(fd);
 	}
 
-	return writeStreamify(PipeEndHW(fd, false));
+	return streamify(PipeEndHW(fd, false));
 }
 
 auto getStderr() @property // @suppress(dscanner.confusing.function_attributes)
@@ -446,5 +495,5 @@ auto getStderr() @property // @suppress(dscanner.confusing.function_attributes)
 		assert(fd);
 	}
 
-	return writeStreamify(PipeEndHW(fd, false));
+	return streamify(PipeEndHW(fd, false));
 }
