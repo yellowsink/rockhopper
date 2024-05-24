@@ -28,19 +28,23 @@ void main()
 		import std.socket : parseAddress;
 		import eventcore.driver : ConnectStatus, IOStatus;
 
-		auto s = streamify(FileH("testscript.d", FileOpenMode.read));
-		for (;;)
-		{
-			/* ubyte[128] buf;
-			auto xfered = s.rawRead(buf); */
-			auto buf = s.rawRead(128);
-			writefln("xfered: %d, eof: %b", buf.length, s.isEof);
+		auto p = Pipe.create();
 
-			if (s.isEof)
-				writeln("last buffer: ", buf);
+		spawn({
+			auto p2 = p;
+			p2.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
+		});
 
-			if (s.isEof) break;
-		}
+		spawn({
+			auto p2 = p;
+			sleep(dur!"msecs"(500));
+			p2.writeStream.rawWrite("test".representation);
+		});
+
+		// let the other fibers copy the reference BEFORE this one finishes
+		// TODO: find some way around closures not causing a copy on creation, thus causing use-after-frees
+		yield();
+		yield();
 	});
 }
 

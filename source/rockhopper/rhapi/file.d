@@ -398,42 +398,74 @@ struct Stream(H) if (isInstanceOf!(Handle, H))
 	// reads into a buffer, updating the index and eof state as necessary, returning the amount written
 	ulong rawRead(ubyte[] buffer) @Async
 	{
-		ulong bytesXfered;
+		static if (!isSeekable) return handle.read(buffer);
+		else
+		{
+			ulong bytesXfered;
 
-		// we only check if this read will EOF using the file length if an error occurs,
-		// as checking length() every time would be relatively expensive.
-		try
-		{
-			static if (isSeekable)
+			// we only check if this read will EOF using the file length if an error occurs,
+			// as checking length() every time would be relatively expensive.
+			try
+			{
 				bytesXfered = handle.read(_index, buffer);
-			else
-				bytesXfered = handle.read(buffer);
-		}
-		catch (FileIOException e)
-		{
-			// can only check for eof with a seekable stream.
-			static if (isSeekable)
+			}
+			catch (FileIOException e)
 			{
 				auto fileLen = length();
 
 				if (
 					// error state MIGHT BE an EOF
-					e.status == IOStatus.error // this read indeed would have EOFed
+					e.status == IOStatus.error
+					// this read indeed would have EOFed
 					&& _index + buffer.length > fileLen)
-					{
+				{
 					bytesXfered = fileLen - _index;
 					_eof = true;
 				}
 				else
 					throw e;
 			}
-			else throw e;
-		}
 
-		static if (isSeekable)
 			_index += bytesXfered;
 
-		return bytesXfered;
+			return bytesXfered;
+		}
+	}
+
+	static if (isWriteable)
+	// reads into a buffer, updating the index and eof state as necessary, returning the amount written
+	ulong rawWrite(const(ubyte)[] buffer) @Async
+	{
+		static if (!isSeekable) return handle.write(buffer);
+		else
+		{
+			ulong bytesXfered;
+
+			try
+			{
+				bytesXfered = handle.write(_index, buffer);
+			}
+			catch (FileIOException e)
+			{
+				auto fileLen = length();
+
+				if (
+					// error state MIGHT BE an EOF
+					e.status == IOStatus.error
+					// this read indeed would have EOFed
+					&& _index + buffer.length > fileLen)
+				{
+					bytesXfered = fileLen - _index;
+					_eof = true;
+				}
+				else
+					throw e;
+			}
+
+			_index += bytesXfered;
+
+			return bytesXfered;
+		}
 	}
 
 	static if (isReadable)
@@ -444,7 +476,6 @@ struct Stream(H) if (isInstanceOf!(Handle, H))
 		return buf[0 .. xfered];
 	}
 
-	// TODO: rawWrite
 	// TODO: nice apis
 }
 
