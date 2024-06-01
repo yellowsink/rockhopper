@@ -91,6 +91,6 @@ and the scheduler busy-waits.
 
 - [The API references](apis/README.md) - Rockhopper has a few different APIs, and they are documented in depth.
   This also explains what you can do with Rockhopper and how.
-- [Drawbacks](drawbacks.md) of using Rockhopper.
+- [Drawbacks](drawbacks.md) (and gotchas!) of using Rockhopper.
 - [Threads and Thread-Safety](threading.md) - Rockhopper *can* work with multiple threads, but it involves more care.
 

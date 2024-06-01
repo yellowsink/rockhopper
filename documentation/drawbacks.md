@@ -42,3 +42,49 @@ Rockhopper is not the most efficient possible implementation, and does make some
 For example, some eventcore APIs return values to you that are only valid within the callback, due to referencing
 stack-allocated memory.
 Where appropriate, Rockhopper just clones this to the heap to remove the limitation.
+
+## Closures and stack references
+
+You may find yourself writing code like this, especially using RAII types:
+
+```d
+entrypoint({
+	auto p = Pipe.create(); // 1: create a pipe
+
+	spawn({
+		// 3: this callback is run now the reactor is free, but!
+		// `p` now represents a freed pipe, and not only that, but
+		// the pointer to `p` was is now something completely different due to being in the stack, so `p` is garbage!
+		// so: undefined behaviour (most often a segv).
+		p.writeStream.rawWrite([42]);
+	});
+
+	// 2: p goes out of scope and the files and memory are freed
+});
+```
+
+This is not great, but there are a few ways of getting around this.
+
+First is to `yield()` enough times to ensure that all relevant values are cloned - you could do this by copying every
+struct you use into a closure-local variable right at the very top, only using those values from then on,
+and `yield()`ing once after your spawn.
+
+A less flaky way to do this would be to use some kind of synchronization tool to keep the spawning fiber alive until
+the child fibers are finished - `FWaitGroup` is a nice option here, Go-style:
+
+```d
+entrypoint({
+	auto p = Pipe.create(); // 1: create a pipe
+
+	auto wg = FWaitGroup(1);
+	spawn({
+		// 3: this callback is run now, while p is still valid
+		p.writeStream.rawWrite([42]);
+	});
+
+	// 2: wait group yields control
+	wg.wait();
+
+	// 4: p goes out of scope and the files and memory are freed
+});
+```

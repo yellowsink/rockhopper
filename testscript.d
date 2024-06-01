@@ -30,21 +30,21 @@ void main()
 
 		auto p = Pipe.create();
 
+		auto wg = FWaitGroup(2);
+
 		spawn({
-			auto p2 = p;
-			p2.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
+			p.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
+			wg.done();
 		});
 
 		spawn({
-			auto p2 = p;
 			sleep(dur!"msecs"(500));
-			p2.writeStream.rawWrite("test".representation);
+			p.writeStream.rawWrite("test".representation);
+			wg.done();
 		});
 
-		// let the other fibers copy the reference BEFORE this one finishes
-		// TODO: find some way around closures not causing a copy on creation, thus causing use-after-frees
-		yield();
-		yield();
+		wg.wait();
+
 	});
 }
 
