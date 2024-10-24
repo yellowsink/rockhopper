@@ -19,14 +19,11 @@ dub add rockhopper
 Then import the essentials and set up an async entrypoint:
 
 ```d
-import rockhopper : entrypoint;
+import rockhopper;
 
-void main() { entrypoint(&mainAsync); }
-
-void mainAsync()
-{
+mixin rhMain!({
 	// write your code here!
-}
+});
 ```
 
 Now you can spawn concurrent fibers with `spawn`, and pass execution to other fibers with `yield`.

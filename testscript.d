@@ -18,33 +18,26 @@ import eventcore.core : eventDriver;
 
 import core.thread.osthread : Thread;
 
+mixin rhMain!({
+	import rockhopper.rhapi.file;
+	import std.string : representation, assumeUTF;
+	import std.socket : parseAddress;
+	import eventcore.driver : ConnectStatus, IOStatus;
 
-void main()
-{
-	entrypoint({
+	auto p = Pipe.create();
 
-		import rockhopper.rhapi.file;
-		import std.string : representation, assumeUTF;
-		import std.socket : parseAddress;
-		import eventcore.driver : ConnectStatus, IOStatus;
+	auto wg = FWaitGroup(2);
 
-		auto p = Pipe.create();
-
-		auto wg = FWaitGroup(2);
-
-		spawn({
-			p.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
-			wg.done();
-		});
-
-		spawn({
-			sleep(dur!"msecs"(500));
-			p.writeStream.rawWrite("test".representation);
-			wg.done();
-		});
-
-		wg.wait();
-
+	spawn({
+		p.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
+		wg.done();
 	});
-}
 
+	spawn({
+		sleep(dur!"msecs"(500));
+		p.writeStream.rawWrite("test".representation);
+		wg.done();
+	});
+
+	wg.wait();
+});
