@@ -5,11 +5,17 @@ module rockhopper.core.reactor;
 import core.thread.fiber : Fiber;
 import rockhopper.core.suspends : SuspendSend, SuspendReturn;
 import rockhopper.core.uda : Async;
+import std.traits : isCallable;
 
 public {
 	void spawn(void delegate() fn)
 	{
 		reactor.enqueueFiber(fn);
+	}
+
+	mixin template rhMain(void delegate() fn)
+	{
+		void main() { entrypoint(fn); };
 	}
 
 	void entrypoint(void delegate() fn)
