@@ -311,11 +311,10 @@ final shared @ThreadSafe class TMessageBox(T)
 	private TEvent sendEv = new TEvent;
 	private DList!T queue;
 
-	synchronized void send(T val, bool shouldYield = true) @Async
+	synchronized void send(T val)
 	{
 		queue.insertBack(val);
 		sendEv.notify();
-		if (shouldYield) yield();
 	}
 
 	T receive() @Async

@@ -273,12 +273,9 @@ struct FMessageBox(T)
 
 	private DList!T queue;
 
-	void send(T val, bool shouldYield = true) @Async
+	void send(T val)
 	{
 		queue.insertBack(val);
-
-		// probably most sensible to do this?
-		if (shouldYield) yield();
 	}
 
 	T receive() @Async

@@ -25,7 +25,7 @@ marker that they are causing their fiber to be suspended.
 
 One option here is to make liberal use of tasks.
 
-## `entrypoint`
+## `entrypoint` / `rhMain`
 
 You cannot simply open your project and start using fibers.
 Technically Rockhopper could be modified to get around this, but for the time being it is most sensible to make starting
@@ -42,6 +42,8 @@ Rockhopper is not the most efficient possible implementation, and does make some
 For example, some eventcore APIs return values to you that are only valid within the callback, due to referencing
 stack-allocated memory.
 Where appropriate, Rockhopper just clones this to the heap to remove the limitation.
+
+Also worth noting that the thread safe fiber sync primitives are not efficient. The single-threaded fiber ones are. :)
 
 ## Closures and stack references
 
