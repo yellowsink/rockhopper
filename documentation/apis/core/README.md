@@ -25,3 +25,6 @@ It generally serves two jobs:
 
 [`threading`](threading.md) has tools for managing threads. It is unlikely that your app will need threads,
 but if it does, these are the tools to use to manage them.
+
+[`uda`](uda.md) contains user-defined-attributes that the APIs use to communicate information about their behaviour
+to you quickly and efficiently, e.g. `@Async`.

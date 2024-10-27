@@ -19,7 +19,7 @@ This is per-resource (generally the one that has a file descriptor), not globall
 ## `nsLookup`
 
 ```d
-SRNsLookup nsLookup(string) [ASYNC]
+SRNsLookup nsLookup(string) @Async
 ```
 
 `nsLookup` takes a domain name in string form (e.g. "google.com", "yellows.ink"), and performs a DNS lookup on it.
@@ -40,13 +40,17 @@ writeln(res.addresses);
 ## `waitThreadEvent`
 
 ```d
-void waitThreadEvent(EventID) [ASYNC]
+void waitThreadEvent(EventID) @Async
 ```
 
 Given a thread event (created with `eventDriver.events.create`), wait for it to be triggered.
 It MUST have been created on the current thread.
 
-You can trigger this event from any thread by casting `eventDriver` to `shared`, then calling its `.events.trigger()`.
+You can trigger this event from any thread by casting the creator's `eventDriver` to `shared`,
+then calling its `.events.trigger()` from another thread.
+
+Note: you most likely want `rhapi.synct.TEvent`, which handles the inconvenient thread rules for you,
+and also handles fibers correctly.
 
 [corresponding eventcore documentation](https://vibed.org/api/eventcore.driver/EventDriverEvents)
 
@@ -69,7 +73,7 @@ writeln("2!");
 ## `fileOpen`
 
 ```d
-SRFileOpen fileOpen(string, FileOpenMode) [ASYNC]
+SRFileOpen fileOpen(string, FileOpenMode) @Async
 ```
 
 Opens a file descriptor from its path and a given mode.
@@ -81,7 +85,7 @@ You must eventually pass this to either `fileClose` or `eventDriver.files.releas
 ## `fileClose`
 
 ```d
-CloseStatus fileClose(FileFD) [ASYNC]
+CloseStatus fileClose(FileFD) @Async
 ```
 
 Closes a file descriptor.
@@ -92,7 +96,7 @@ Technically this is not actually asynchronous, but does behave like it for forwa
 ## `fileRead`
 
 ```d
-SRRW fileRead(FileFD, ulong oset, ubyte[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW fileRead(FileFD, ulong oset, ubyte[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Reads bytes from the file, starting at the given byte offset, into the buffer.
@@ -119,7 +123,7 @@ writeln(assumeUTF(buffer));
 ## `pipeRead`
 
 ```d
-SRRW pipeRead(PipeFD, ubyte[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW pipeRead(PipeFD, ubyte[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Reads bytes from the pipe into the buffer.
@@ -151,7 +155,7 @@ eventDriver.pipes.releaseRef(fd);
 ## `fileWrite`
 
 ```d
-SRRW fileWrite(FileFD, ulong oset, const(ubyte)[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW fileWrite(FileFD, ulong oset, const(ubyte)[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Writes asynchronously to a file.
@@ -169,7 +173,7 @@ If the mode of the opened file is `read`, this call fails.
 ## `pipeWrite`
 
 ```d
-SRRW pipeWrite(PipeFD, const(ubyte)[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW pipeWrite(PipeFD, const(ubyte)[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Writes a buffer to a pipe.
@@ -179,7 +183,7 @@ Writes a buffer to a pipe.
 ## `processWait`
 
 ```d
-int processWait(ProcessID) [ASYNC]
+int processWait(ProcessID) @Async
 ```
 
 Given a process ID, waits for it to exit, and returns the exit code.
@@ -201,7 +205,7 @@ writeln("exited with code: ", processWait(adopted));
 ## `signalTrap`
 
 ```d
-SignalStatus signalTrap(int) [ASYNC]
+SignalStatus signalTrap(int) @Async
 ```
 
 Overrides default event handlers for the relevant signal, and waits for the specified signal to arrive.
@@ -223,11 +227,11 @@ spawn({ // in most cases, likely do this in the background
 ## `sleep`
 
 ```d
-void sleep(Duration) [ASYNC]
+void sleep(Duration) @Async
 ```
 
 Sleeps your thread for the given duration.
-Likely to be the first function you'll try if you mess around. :p
+Likely to be the first function you'll try when playing with the API.
 
 Note that this is also subtly different to the behaviour of directly using the suspend with the reactor,
 which will expect you to create a timer on your own.
@@ -245,7 +249,7 @@ sleep(dur!"msecs"(500));
 ## `streamConnect`
 
 ```d
-SRStreamConnect streamConnect(Address peer, Address bind) [ASYNC]
+SRStreamConnect streamConnect(Address peer, Address bind) @Async
 ```
 
 Initiates a TCP connection to `peer`, expecting a reply on `bind`.
@@ -275,7 +279,7 @@ struct StreamListen
 	void registerWaitConns();
 	void cleanup();
 
-	Tuple!(StreamSocketFD, RefAddress) wait(); [ASYNC]
+	Tuple!(StreamSocketFD, RefAddress) wait(); @Async
 }
 ```
 
@@ -324,7 +328,7 @@ listener.cleanup();
 ## `streamRead`
 
 ```d
-SRRW streamRead(StreamSocketFD, ubyte[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW streamRead(StreamSocketFD, ubyte[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Reads as much as possible from a TCP stream into a buffer, returning the amount read.
@@ -334,7 +338,7 @@ Reads as much as possible from a TCP stream into a buffer, returning the amount 
 ## `streamWaitForData`
 
 ```d
-IOStatus streamWaitForData(StreamSocketFD) [ASYNC] [SINGULAR]
+IOStatus streamWaitForData(StreamSocketFD) @Async [SINGULAR]
 ```
 
 Waits until data is ready, without actually reading it.
@@ -345,7 +349,7 @@ Note that the status will not necessarily reflect a passive connection close, re
 ## `streamWrite`
 
 ```d
-SRRW streamWrite(StreamSocketFD, const(ubyte)[], IOMode = IOMode.once) [ASYNC] [SINGULAR]
+SRRW streamWrite(StreamSocketFD, const(ubyte)[], IOMode = IOMode.once) @Async [SINGULAR]
 ```
 
 Writes a buffer to a TCP stream.
@@ -355,7 +359,7 @@ Writes a buffer to a TCP stream.
 ## `dgramReceive`
 
 ```d
-SDRgramSendReceive dgramReceive(DatagramSocketFD, ubyte[], IOMode = IOMode.once) [ASYNC]
+SDRgramSendReceive dgramReceive(DatagramSocketFD, ubyte[], IOMode = IOMode.once) @Async
 ```
 
 Receives a single UDP datagram from a listening socket.
@@ -379,7 +383,7 @@ eventDriver.sockets.releaseRef(socket);
 ## `dgramSend`
 
 ```d
-SRDgramSendReceive dgranSend(DatagramSocketFD, const(ubyte)[], Address, IOMode = IOMode.once) [ASYNC]
+SRDgramSendReceive dgramSend(DatagramSocketFD, const(ubyte)[], Address, IOMode = IOMode.once) @Async
 ```
 
 Writes the buffer to the given UDP socket, to the given address.

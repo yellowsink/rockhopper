@@ -5,7 +5,7 @@ respect fibers.
 
 If you are using multiple threads in your application, you should absolutely be using the `synct` tools for syncing,
 as using the `core.sync` module may lead to unnecessary blocking and thus loss of performance
-(["Don't block the executor"](https://fasterthanli.me/articles/pin-and-suffering])), or even deadlocking.
+(["Don't block the executor"](https://fasterthanli.me/articles/pin-and-suffering)), or even deadlocking.
 
 For single threaded scenarios, the `syncf` tools provide familiar looking APIs for keeping fibers in check that are
 very efficient.
@@ -39,19 +39,13 @@ This does not matter for `synct` tools, as they are classes with reference seman
 ```d
 struct FEvent
 {
-	bool isSignaled();
 	void notify();
-	void reset();
-	void wait(); [ASYNC]
-	bool wait(Duration); [ASYNC]
+	void wait() @Async;
 }
 ```
 
-Waiting on an event will cause all waiting fibers to be suspended until it is notified.
-Once it has been notified, waits on it will instantly resolve until it is reset.
-
-You may pass a duration to wait for either the event or for a timeout, which will return true if the event was raised,
-or false if it returned due to timeout.
+All fibers that call `wait` on an event will be suspended until another fiber calls `notify`,
+at which point all currently waiting fibers will resume.
 
 ## `TEvent`
 
@@ -59,12 +53,11 @@ or false if it returned due to timeout.
 class TEvent
 {
 	void notify();
-	void reset();
-	void wait(); [ASYNC]
+	void wait() @Async;
 }
 ```
 
-`TEvent` works effectively the same as an event except that it works across multiple threads.
+`TEvent` works effectively the same as an fevent except that it works across multiple threads.
 You can create a `TEvent` on one thread, then notify it later while another thread's reactor has a fiber waiting on it.
 
 It is the most basic primitive to sync up fibers across multiple threads.
@@ -77,8 +70,7 @@ struct FSemaphore
 {
 	void notify();
 	bool tryWait();
-	void wait(); [ASYNC]
-	bool wait(Duration); [ASYNC]
+	void wait() @Async;
 }
 ```
 
@@ -96,7 +88,7 @@ class TSemaphore
 {
 	void notify();
 	bool tryWait();
-	void wait(); [ASYNC]
+	void wait() @Async;
 }
 ```
 
@@ -105,7 +97,7 @@ class TSemaphore
 ```d
 struct FMutex
 {
-	void lock(); [ASYNC]
+	void lock() @Async;
 	void unlock();
 }
 ```
@@ -113,12 +105,24 @@ struct FMutex
 A basic mutex. Only one lock can be held at a time. Trying to lock a locked mutex will wait for it to be unlocked.
 This mutex is NOT re-entrant - see `FReMutex`.
 
+You may not unlock an unlocked mutex.
+
+## `TMutex`
+
+```d
+class TMutex
+{
+	void lock() @Async;
+	void unlock();
+}
+```
+
 ## `FReMutex`
 
 ```d
 struct FReMutex
 {
-	void lock(); [ASYNC]
+	void lock() @Async;
 	void unlock();
 }
 ```
@@ -126,7 +130,7 @@ struct FReMutex
 This is a *recursive* (re-entrant) mutex. It is either locked or unlocked, and when a fiber `lock`s it, any other fibers
 trying to lock it will be suspended until the locking fiber `unlock`s it.
 
-Being recursive, the same fiber can lock it *multiple times*, and must unlock it the corresponding number of times to
+Being recursive, the SAME fiber can lock it *multiple times*, and must unlock it the corresponding number of times to
 actually release the lock. This is useful because a function can lock at the start and unlock before return and still
 call itself, without unlocking earlier than is intended or breaking the mutex.
 
@@ -137,8 +141,8 @@ Only the current lock holder is allowed to unlock.
 ```d
 struct FRWMutex
 {
-	void lockWrite(); [ASYNC]
-	void lockRead(); [ASYNC]
+	void lockWrite() @Async;
+	void lockRead() @Async;
 	void unlockWrite();
 	void unlockRead();
 }
@@ -147,6 +151,7 @@ struct FRWMutex
 A read-write-mutex has two kinds of lock state: locked for reading, and locked for writing.
 
 The mutex is NOT recursive.
+
 It can have any number of read locks, but this means the write MUST be unlocked.
 It can instead have ONE write lock, but this means there MUST be zero read locks.
 
@@ -162,7 +167,7 @@ struct FGuardedResult(T)
 	bool hasValue();
 	void set(T val);
 	void nullify();
-	T get(); [ASYNC]
+	T get() @Async;
 	Nullable!T tryGet();
 }
 ```
@@ -177,7 +182,7 @@ struct FWaitGroup
 {
 	void add(uint);
 	void done();
-	void wait(); [ASYNC]
+	void wait() @Async;
 }
 ```
 
@@ -190,9 +195,8 @@ This should be familiar to Go programmers.
 ```d
 struct FMessageBox(T)
 {
-	void send(T val); [ASYNC]
-	void send(T val, false);
-	T receive(); [ASYNC]
+	void send(T val);
+	T receive() @Async;
 	Nullable!T tryReceive();
 }
 ```
@@ -203,7 +207,7 @@ It works like channels in Go.
 ## `fSynchronized(alias F)`
 
 ```d
-ReturnType!F fSynchronized(alias F)(Parameters!F) [ASYNC]
+ReturnType!F fSynchronized(alias F)(Parameters!F) @Async @Synchronized
 ```
 
 `fSynchronized` can be used similarly to the D `synchronized` attribute. Only one fiber is allowed to call the function

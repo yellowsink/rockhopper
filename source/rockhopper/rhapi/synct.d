@@ -4,7 +4,7 @@
 // is allowed to lock that mutex, across many threads.
 
 module rockhopper.rhapi.synct;
-import rockhopper.core.uda : Async, ThreadSafe;
+import rockhopper.core.uda : Async, ThreadSafe, Synchronized;
 
 import rockhopper.core.llevents : waitThreadEvent;
 import core.atomic : atomicOp;
@@ -205,7 +205,7 @@ template tSynchronized(alias func)
 	{
 		TMutex m;
 
-		ReturnType!func tSynchronized(Parameters!func args) @Async
+		ReturnType!func tSynchronized(Parameters!func args) @Async @Synchronized
 		{
 			m.lock();
 			func(args);

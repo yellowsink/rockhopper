@@ -8,7 +8,7 @@ module rockhopper.rhapi.syncf;
 
 import rockhopper.core.reactor : yield, spawn;
 import rockhopper.core.llevents : sleep;
-import rockhopper.core.uda : Async;
+import rockhopper.core.uda : Async, Synchronized;
 import std.datetime : Duration;
 import core.thread.fiber : Fiber;
 
@@ -188,7 +188,7 @@ template fSynchronized(alias func)
 	{
 		FMutex m;
 
-		ReturnType!func fSynchronized(Parameters!func args) @Async
+		ReturnType!func fSynchronized(Parameters!func args) @Async @Synchronized
 		{
 			m.lock();
 			func(args);

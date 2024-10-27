@@ -13,7 +13,7 @@ struct ThreadHandle
 	Thread th;
 	shared(EventDriver) ed;
 
-	void join(); [ASYNC]
+	void join() @Async;
 	void spawn(void delegate());
 }
 ```
@@ -27,7 +27,7 @@ and calling `spawn` is equivalent to calling `spawnInThread` on this handle's `E
 ## `spawnThread`
 
 ```d
-ThreadHandle spawnThread(void delegate() fn);
+ThreadHandle spawnThread(void delegate() fn) @Async;
 ```
 
 Spawns a thread, and runs the given function as a fiber in that thread's reactor.
@@ -48,7 +48,7 @@ You may only call this given that the reactor on the target thread is still runn
 ## `joinThread`
 
 ```d
-void joinThread(Thread th); [ASYNC]
+void joinThread(Thread th) @Async;
 ```
 
 Asynchronously waits for this thread to exit from within any fiber.

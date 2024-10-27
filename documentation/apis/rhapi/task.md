@@ -15,18 +15,18 @@ struct Task(void)
 {
 	bool isFinished();
 	bool tryGetRes();
-	T waitRes(); [ASYNC]
-	R then(R delegate());
-	R then(R function());
+	T waitRes() @Async;
+	Task!R then(R delegate());
+	Task!R then(R function());
 }
 
-struct Task(T) // where T is not void
+struct Task(T) if (!is(T == void))
 {
 	bool isFinished();
 	Nullable!T tryGetRes();
-	T waitRes(); [ASYNC]
-	R then(R delegate(T));
-	R then(R function(T));
+	T waitRes() @Async;
+	Task!R then(R delegate(T));
+	Task!R then(R function(T));
 }
 ```
 
@@ -41,8 +41,8 @@ The API has been designed such that type inference should work automatically.
 ## `tSpawn`
 
 ```d
-R tSpawn(R function());
-R tSpawn(R delegate());
+Task!R tSpawn(R function());
+Task!R tSpawn(R delegate());
 ```
 
 Spawns a task that runs the given function as a fiber, and completes when it returns a value.
@@ -69,9 +69,9 @@ Calls to `waitRes` will resolve instantly, and calls to `then` will run the call
 
 ```d
 // homogenous version
-void waitAllTasks(T)(Task!T*[] tasks) [ASYNC]
+void waitAllTasks(T)(Task!T*[] tasks) @Async
 // heterogenous version
-void waitAllTasks(T...)() [ASYNC]
+void waitAllTasks(T...)() @Async
 ```
 
 `waitAllTasks` waits asynchronously for all the tasks given to resolve.
@@ -84,9 +84,9 @@ You may only wait on tasks created on the same thread as the caller.
 
 ```d
 // homogenous version
-void waitAnyTask(T)(Task!T*[] tasks) [ASYNC]
+void waitAnyTask(T)(Task!T*[] tasks) @Async
 // heterogenous version
-void waitAnyTask(T...)() [ASYNC]
+void waitAnyTask(T...)() @Async
 ```
 
 `waitAnyTask` waits asynchronously for at least one of the given tasks to resolve, but not necessarily all of them.
@@ -98,8 +98,8 @@ You may only wait on tasks created on the same thread as the caller.
 ## `tSpawnAsThread`
 
 ```d
-R tSpawnAsThread(R delegate());
-R tSpawnAsThread(R function());
+Task!R tSpawnAsThread(R delegate());
+Task!R tSpawnAsThread(R function());
 ```
 
 Spawns a task that runs the given function on a newly spawned thread, then passes the result back to your thread.

@@ -11,3 +11,5 @@ helpful utilities that make working with Rockhopper much easier, such as sync pr
 [`syncf` and `synct`](sync.md) contains synchronization tools to help you coordinate fibers and threads.
 All `syncf` members are NOT thread-safe, stack-allocated, need no initialization, and designed for efficiency.
 All `synct` members are thread-safe and use reference semantics (classes), therefore needing runtime construction.
+
+[`file`](file.md) contains tools for working nicely with files and pipes.
