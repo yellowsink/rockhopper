@@ -9,6 +9,10 @@ import rockhopper.core.uda : Async, ThreadSafe;
 import rockhopper.core.llevents : waitThreadEvent;
 import core.atomic : atomicOp;
 
+// for note for future me:
+// `synchronized` methods lock on the whole instance, not per-method:
+// https://dlang.org/spec/class.html#synchronized-methods #16.6.1
+
 // These need to be classes so we can use `synchronized(this)` and `synchronized` members
 
 final shared @ThreadSafe class TEvent
@@ -148,5 +152,213 @@ final shared @ThreadSafe class TSemaphore
 			// count was not greater than zero, so someone else got here first!
 			// we let go of the lock and get back to waiting.
 		}
+	}
+}
+
+// non-recursive mutex
+// im PRETTY SURE this is safe but don't shoot me if it isn't im doing my best
+final shared @ThreadSafe class TMutex
+{
+@ThreadSafe:
+
+	private bool locked;
+	private TEvent unlockEv = new TEvent;
+
+	void lock() @Async
+	{
+		while (true)
+		{
+			// get control of this and check if we can take it
+			synchronized (this)
+			{
+				if (!locked)
+				{
+					// we can lock!
+					locked = true;
+					return;
+				}
+			}
+
+			// we didn't get it this time, wait for the unlocker to notify us.
+			// explanation to future me as to why this has to be done with a wait()-reset() like this:
+			// immediately reset the event. this generally will cause the first fiber to be awoken to reset and try and lock,
+			// and all further waiting fibers will not exit wait() as an immediate reset stops the wait from resolving.
+			// !!! NOTE THIS PATTERN ONLY ALLOWS ONE FIBER TO BE WOKEN PER NOTIFY !!!
+			unlockEv.wait();
+			unlockEv.reset();
+		}
+	}
+
+	synchronized void unlock()
+	{
+		assert(locked, "unlocking an unlocked TMutex makes no sense");
+		locked = false;
+		unlockEv.notify();
+	}
+}
+
+// TODO: remutex
+// TODO: rwmutex
+
+// an equivalent of the `synchronized` attribute that also ensures mut-ex of fibers, not just threads.
+template tSynchronized(alias func)
+{
+	import std.traits : isSomeFunction, ReturnType, Parameters;
+
+	static assert(isSomeFunction!func, "tSynchronized may only be instantiated with a function");
+
+	// even though this is always true, if we don't if for it, we get more compiler errors than just the assert
+	// and nobody needs that, so just be satisfied with the assert.
+	static if(isSomeFunction!func)
+	{
+		TMutex m;
+
+		ReturnType!func tSynchronized(Parameters!func args) @Async
+		{
+			m.lock();
+			func(args);
+			m.unlock();
+		}
+	}
+}
+
+// a nullable in which trying to get the value while its null waits for a result to be set
+final shared @ThreadSafe class TGuardedResult(T)
+{
+@ThreadSafe:
+	import std.typecons : Nullable;
+
+	private TEvent setEv = new TEvent;
+	private bool hasValue;
+	private T value;
+
+	synchronized void set(T val)
+	{
+		value = T;
+		hasValue = true;
+		setEv.notify();
+	}
+
+	synchronized void nullify()
+	{
+		hasValue = false;
+		value = T.init;
+		// otherwise one fiber would loop in get() and cause issues.
+		setEv.reset();
+	}
+
+	T get() @Async
+	{
+		while (true)
+		{
+			synchronized (this)
+			{
+				if (hasValue)
+					return value;
+			}
+
+			setEv.wait();
+			// we don't want to reset as the wait-reset pattern only wakes one fiber per notify
+			//setEv.reset();
+		}
+	}
+
+	synchronized Nullable!T tryGet()
+	{
+		if (hasValue) return value;
+		return Nullable!T.init;
+	}
+}
+
+// like a golang WaitGroup
+// see FWaitGroup for more detailed notes on how this works and how it differs from a semaphore
+final shared @ThreadSafe class TWaitGroup
+{
+@ThreadSafe:
+	private TEvent doneEv = new TEvent;
+	// safety: this is only accessed inside `synchronized` sections.
+	private __gshared uint count;
+
+	this() { }
+
+	this(uint c)
+	{
+		count = c;
+	}
+
+	synchronized void add(uint amt)
+	{
+		count += amt;
+		doneEv.reset();
+	}
+
+	synchronized void done()
+	{
+		assert(count > 0);
+		count--;
+		doneEv.notify();
+	}
+
+	void wait() @Async
+	{
+		while (true)
+		{
+			synchronized (this)
+			{
+				if (count == 0) return;
+			}
+
+			doneEv.wait();
+			// see note in TGuardedResult(T).get()
+			//doneEv.reset();
+		}
+	}
+}
+
+// kinda like a channel in go
+final shared @ThreadSafe class TMessageBox(T)
+{
+@ThreadSafe:
+	import std.container : DList;
+	import std.typecons : Nullable;
+
+	private TEvent sendEv = new TEvent;
+	private DList!T queue;
+
+	synchronized void send(T val, bool shouldYield = true) @Async
+	{
+		queue.insertBack(val);
+		sendEv.notify();
+		if (shouldYield) yield();
+	}
+
+	T receive() @Async
+	{
+		while (true)
+		{
+			synchronized (this)
+			{
+				if (!queue.empty)
+				{
+					auto f = queue.front;
+					queue.removeFront();
+					return f;
+				}
+			}
+
+			// wait-reset is the right pattern here as we only really want one thread to wake per notify
+			sendEv.wait();
+			sentEv.reset();
+		}
+	}
+
+	synchronized Nullable!T tryReceive()
+	{
+		if (queue.empty) return Nullable!T.init;
+		// in a good display of why synct is less efficient than syncf,
+		// FMessageBox just calls receive() here for free, but that causes an extra lock here :(
+		auto f = queue.front;
+		queue.removeFront();
+		return f;
 	}
 }

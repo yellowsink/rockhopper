@@ -206,7 +206,7 @@ template fSynchronized(alias func)
 {
 	import std.traits : isSomeFunction, ReturnType, Parameters;
 
-	static assert(isSomeFunction!func, "FSynchronized may only be instantiated with a function");
+	static assert(isSomeFunction!func, "fSynchronized may only be instantiated with a function");
 
 	// even though this is always true, if we don't if for it, we get more compiler errors than just the assert
 	// and nobody needs that, so just be satisfied with the assert.
