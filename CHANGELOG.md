@@ -1,5 +1,4 @@
 ## to-do
-- add more thread safe sync primitives
 - find a way to enforce `@Async`
 - ensure correct exception handling
 
@@ -26,6 +25,7 @@
   * stdin/out/err pipe ends easy to access correctly
 - Rename `FMutex` to `FReMutex`, and make `FMutex` a new NON-recursive mutex
 - add `mixin rhMain` to replace `void main() { entrypoint(&realmain); }`
+- add more thread safe sync primitives
 
 ## `0.0.1-beta.1`
 

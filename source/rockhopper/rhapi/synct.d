@@ -26,9 +26,52 @@ final shared @ThreadSafe class TEvent
 
 	alias ThreadEventsTy = Tuple!(shared(EventDriver), EventID)[typeof(Thread.getThis.id)];
 
-	private bool triggered;
 	// you may only await an event from the thread that created it, so we need one event per thread
-	private ThreadEventsTy threadEvents;
+	// SAFETY: only accessed within `synchronized`
+	private __gshared ThreadEventsTy threadEvents;
+
+	synchronized void notify()
+	{
+		foreach (_, tup; threadEvents)
+			tup[0].events.trigger(tup[1], true);
+
+		// reset at same time since all those thread events are done with now
+		// expect the freshly awoken threads to free the resources we're removing the references to here
+		threadEvents = ThreadEventsTy.init;
+	}
+
+	void wait() @Async
+	{
+		auto tid = Thread.getThis.id;
+		EventID ev = void; // always assigned
+
+		synchronized (this)
+		{
+			if (tid in threadEvents)
+			{
+				ev = threadEvents[tid][1];
+				eventDriver.events.addRef(ev); // just in case two fibers wait this TEvent on the same thread :)
+			}
+			else
+			{
+				ev = eventDriver.events.create();
+				threadEvents[tid] = tuple(cast(shared) eventDriver, ev);
+			}
+		}
+
+		waitThreadEvent(ev);
+		// threadEvents has now been cleared so this is safe to clean up.
+		eventDriver.events.releaseRef(ev); // free resources like a good citizen
+	}
+}
+
+// like TEvent but has a stateful triggered/untriggered value, idk if theres a good name for this
+/* final shared @ThreadSafe class TStatefulEvent
+{
+@ThreadSafe:
+
+	private bool triggered;
+	private TEvent ev = new TEvent;
 
 	synchronized void notify()
 	{
@@ -37,10 +80,7 @@ final shared @ThreadSafe class TEvent
 
 		triggered = true;
 
-		foreach (_, tup; threadEvents)
-			tup[0].events.trigger(tup[1], true);
-
-		threadEvents = ThreadEventsTy.init;
+		ev.notify();
 	}
 
 	synchronized void reset()
@@ -48,49 +88,22 @@ final shared @ThreadSafe class TEvent
 		if (triggered)
 		{
 			triggered = false;
+			// safety: by here no fibers should have a waiting ec event anymore so we can wipe them.
 			threadEvents = ThreadEventsTy.init;
 		}
-		else
-		{
-			// resetting an event that has not been triggered is a no-op!
-			// assert(0);
-		}
+		// resetting an event that has not been triggered is a no-op! - otherwise it could hang fibers forever.
 	}
 
 	void wait() @Async
 	{
-		auto tid = Thread.getThis.id;
-
 		while (!triggered)
 		{
-			EventID ev = void; // always assigned
-
-			synchronized (this)
-			{
-				// while in a synchronized, you can cast away a `shared`
-				// -- technically you can cast shared away any time, but its safe here :)
-				// use a pointer else this causes a copy and that screws stuff up.
-				// we still have to make sure the contents of the AA are shared due to transititivy,
-				// but this fixes it not liking us trying to do the assignment *at all*
-				auto tEvs = cast(ThreadEventsTy*)&threadEvents;
-
-				if (tid in *tEvs)
-				{
-					ev = (*tEvs)[tid][1];
-				}
-				else
-				{
-					ev = eventDriver.events.create();
-					(*tEvs)[tid] = tuple(cast(shared) eventDriver, ev);
-				}
-			}
-
-			waitThreadEvent(ev);
+			ev.wait();
 			// if the thread event resolves, triggered may still be false because another fiber got there before us,
 			// and reset the event. to prevent this case, we loop around again.
 		}
 	}
-}
+} */
 
 final shared @ThreadSafe class TSemaphore
 {
@@ -106,8 +119,7 @@ final shared @ThreadSafe class TSemaphore
 	{
 		count++;
 
-		// notify this event when a new notify is sent
-		// and reset it after each wait.
+		// wake up the fibers!
 		notifyEv.notify();
 	}
 
@@ -117,30 +129,14 @@ final shared @ThreadSafe class TSemaphore
 			return false;
 
 		count--;
-		notifyEv.reset(); // in case nobody else is waiting, reset it ready for next time
 		return true;
 	}
 
 	void wait() @Async
 	{
-		// check if we can go immediately
-		synchronized (this)
-		{
-			if (count > 0)
-			{
-				notifyEv.reset(); // must have been triggered, likely not cleared up.
-
-				count--;
-				return;
-			}
-		}
-
-		// no? okay, wait for the event, then see if we can decrement, if not try again.
 		while (true)
 		{
-			notifyEv.wait();
-			notifyEv.reset(); // reset the lock for next time. should be safe to do this lock-free.
-
+			// try and "wake" this fiber, only one thread and therefore fiber is allowed in this block at a time.
 			synchronized (this)
 			{
 				if (count > 0)
@@ -149,8 +145,9 @@ final shared @ThreadSafe class TSemaphore
 					return;
 				}
 			}
-			// count was not greater than zero, so someone else got here first!
-			// we let go of the lock and get back to waiting.
+
+			// someone else got here first! release the lock and wait until we're told theres new notifies.
+			notifyEv.wait();
 		}
 	}
 }
@@ -168,7 +165,7 @@ final shared @ThreadSafe class TMutex
 	{
 		while (true)
 		{
-			// get control of this and check if we can take it
+			// see if we get to take the mutex!
 			synchronized (this)
 			{
 				if (!locked)
@@ -179,13 +176,8 @@ final shared @ThreadSafe class TMutex
 				}
 			}
 
-			// we didn't get it this time, wait for the unlocker to notify us.
-			// explanation to future me as to why this has to be done with a wait()-reset() like this:
-			// immediately reset the event. this generally will cause the first fiber to be awoken to reset and try and lock,
-			// and all further waiting fibers will not exit wait() as an immediate reset stops the wait from resolving.
-			// !!! NOTE THIS PATTERN ONLY ALLOWS ONE FIBER TO BE WOKEN PER NOTIFY !!!
+			// we didn't get it this time, efficiently wait for an unlock.
 			unlockEv.wait();
-			unlockEv.reset();
 		}
 	}
 
@@ -243,12 +235,11 @@ final shared @ThreadSafe class TGuardedResult(T)
 	{
 		hasValue = false;
 		value = T.init;
-		// otherwise one fiber would loop in get() and cause issues.
-		setEv.reset();
 	}
 
 	T get() @Async
 	{
+		// this pattern should be familiar by now, if not, read the comments on some earlier sync tools
 		while (true)
 		{
 			synchronized (this)
@@ -258,8 +249,6 @@ final shared @ThreadSafe class TGuardedResult(T)
 			}
 
 			setEv.wait();
-			// we don't want to reset as the wait-reset pattern only wakes one fiber per notify
-			//setEv.reset();
 		}
 	}
 
@@ -289,7 +278,6 @@ final shared @ThreadSafe class TWaitGroup
 	synchronized void add(uint amt)
 	{
 		count += amt;
-		doneEv.reset();
 	}
 
 	synchronized void done()
@@ -309,8 +297,6 @@ final shared @ThreadSafe class TWaitGroup
 			}
 
 			doneEv.wait();
-			// see note in TGuardedResult(T).get()
-			//doneEv.reset();
 		}
 	}
 }
@@ -346,9 +332,7 @@ final shared @ThreadSafe class TMessageBox(T)
 				}
 			}
 
-			// wait-reset is the right pattern here as we only really want one thread to wake per notify
 			sendEv.wait();
-			sentEv.reset();
 		}
 	}
 

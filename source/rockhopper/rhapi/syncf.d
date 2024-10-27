@@ -19,27 +19,16 @@ struct FEvent
 	@disable this(ref FEvent);
 
 	private bool raised;
-
-	bool isSignaled() inout @property { return raised; }
+	private uint waiters;
 
 	void notify() { raised = true; }
-	void reset() { raised = false; }
 
 	void wait() @Async
 	{
+		waiters++;
 		while (!raised) yield();
-	}
-
-	bool wait(Duration timeout) @Async
-	{
-		bool timedOut;
-		spawn({
-			sleep(timeout);
-			timedOut = true;
-		});
-
-		while (!raised && !timedOut) yield();
-		return raised;
+		waiters--;
+		if (waiters == 0) raised = false; // auto-reset
 	}
 }
 
@@ -66,21 +55,6 @@ struct FSemaphore
 	{
 		while (count == 0) yield();
 		count--;
-	}
-
-	bool wait(Duration timeout) @Async
-	{
-		bool timedOut;
-		spawn({
-			sleep(timeout);
-			timedOut = true;
-		});
-
-		while ((count == 0) && !timedOut) yield();
-		if (count == 0) return false;
-
-		count--;
-		return true;
 	}
 }
 
