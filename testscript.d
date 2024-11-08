@@ -10,6 +10,10 @@ module testscript;
 
 import std.stdio;
 import std.datetime : dur, MonoTime;
+import std.conv : to;
+import std.string : representation, assumeUTF;
+import std.socket : parseAddress;
+import eventcore.driver : ConnectStatus, IOStatus, IOMode;
 
 import rockhopper.core;
 import rockhopper.rhapi;
@@ -19,25 +23,38 @@ import eventcore.core : eventDriver;
 import core.thread.osthread : Thread;
 
 mixin rhMain!({
-	import rockhopper.rhapi.file;
-	import std.string : representation, assumeUTF;
-	import std.socket : parseAddress;
-	import eventcore.driver : ConnectStatus, IOStatus;
 
-	auto p = Pipe.create();
+	StreamListen sl;
+	sl.addr = parseAddress("::1", 8080);
+	sl.registerListen();
 
-	auto wg = FWaitGroup(2);
+	while (true)
+	{
+		writeln("waiting for conn...");
+		// listen for incoming tcp connections
+		auto stream = sl.wait();
+		writeln("new connection accepted!");
 
-	spawn({
-		p.readStream.rawRead(15).assumeUTF.writeln; // only reads 4
-		wg.done();
-	});
+		spawn({
+			// just clone this to be safe.
+			auto s = stream[0];
 
-	spawn({
-		sleep(dur!"msecs"(500));
-		p.writeStream.rawWrite("test".representation);
-		wg.done();
-	});
+			while (true)
+			{
+				writeln("in sleep loop! fd: ", s);
+				sleep(dur!"msecs"(300));
+				writeln("sleep returned.");
 
-	wg.wait();
+				auto res = streamWrite(s, "hi!\n".representation);
+				// HELP CODE EXECUTION NEVER GETS TO THIS COMMENT HERE, WHY IS MY REACTOR BROKEN?
+				writeln("write returned");
+
+				if (res.status != IOStatus.ok)
+				{
+					writeln("err: ", res.status);
+					break;
+				}
+			}
+		});
+	}
 });
