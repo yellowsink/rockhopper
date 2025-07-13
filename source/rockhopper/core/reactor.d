@@ -13,7 +13,7 @@ public {
 		reactor.enqueueFiber(fn);
 	}
 
-	mixin template rhMain(alias fn) if (is(typeof(fn) == void delegate()) || is(typeof(fn) == void function()))
+	mixin template rhMain(alias fn) //if (is(typeof(fn) == void delegate()) || is(typeof(fn) == void function()))
 	{
 		void main() { entrypoint(fn); };
 	}
