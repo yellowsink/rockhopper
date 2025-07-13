@@ -84,6 +84,7 @@ struct StreamListen
 	{
 		assert(!fd.isNull);
 		eventDriver.sockets.releaseRef(fd.get);
+		fd.nullify();
 	}
 
 	Tuple!(StreamSocketFD, RefAddress) wait() @Async
@@ -93,6 +94,11 @@ struct StreamListen
 		auto s = sockets[0];
 		sockets = sockets[1 .. $];
 		return s;
+	}
+
+	~this()
+	{
+		if (!fd.isNull) cleanup();
 	}
 }
 
