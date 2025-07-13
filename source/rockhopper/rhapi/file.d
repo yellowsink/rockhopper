@@ -8,6 +8,13 @@ import eventcore.driver : FileFD, PipeFD, OpenStatus, IOStatus;
 
 import std.traits : isInstanceOf;
 
+// are you god damn kidding me
+version (OSX) version = Darwin;
+version (iOS) version = Darwin;
+version (TVOS) version = Darwin;
+version (WatchOS) version = Darwin;
+version (VisionOS) version = Darwin;
+
 
 class FileException(S) : Exception
 {
@@ -213,19 +220,47 @@ private struct Handle(bool IS_PIPE = false, bool READABLE = true, bool WRITEABLE
 	static if (!IS_PIPE)
 	void sync()
 	{
-		// TODO: Windows support
-		// TODO: Darwin support
-		import core.sys.posix.unistd : fsync;
 		import std.exception : errnoEnforce;
 
-		errnoEnforce(fsync(fileno) == 0);
+		version (Windows)
+		{
+			import core.sys.windows.basetsd : HANDLE;
+			import core.sys.windows.winbase : FlushFileBuffers;
+
+			size_t hdl_raw = _impl.fd.value.value;
+			HANDLE hdl = cast(HANDLE) hdl_raw;
+
+			errnoEnforce(FlushFileBuffers(hdl) == 0);
+		}
+		else version (Darwin)
+		{
+			// https://transactional.blog/blog/2022-darwins-deceptive-durability
+			// fsync is not enough
+			import core.sys.darwin.fcntl : fcntl, F_FULLFSYNC;
+
+			errnoEnforce(fcntl(fileno(), F_FULLFSYNC) != -1);
+		}
+		else
+		{
+			import core.sys.posix.unistd : fsync;
+
+			errnoEnforce(fsync(fileno) == 0);
+		}
 	}
 
-	@property int fileno() const
+	// returns int on posix, HANDLE on windows
+	@property auto fileno() const
 	{
 		auto fd = _impl.fd.value.value;
 		assert(fd < int.max);
-		return cast(int) fd;
+
+		version (Windows)
+		{
+			import core.sys.windows.basetsd : HANDLE;
+			return cast(HANDLE) fd;
+		}
+		else
+			return cast(int) fd;
 	}
 
 	static if (!IS_PIPE)
@@ -313,6 +348,7 @@ struct Pipe
 		}
 		else
 		{
+			static assert(0, "not implemented yet");
 			// TODO
 		}
 	}
@@ -325,7 +361,7 @@ enum SeekOrigin
 	end
 }
 
-struct Stream(H) if (isInstanceOf!(Handle, H))
+struct Stream(H, ulong BUFSIZE = 256) if (isInstanceOf!(Handle, H))
 {
 	H handle;
 
@@ -475,6 +511,21 @@ struct Stream(H) if (isInstanceOf!(Handle, H))
 		auto xfered = rawRead(buf);
 		return buf[0 .. xfered];
 	}
+
+	// TODO: r/w buffering
+
+	/* APIs to implement:
+	copyto
+	read
+	readatleast
+	readbyte
+	readexactly
+	write
+	range support
+	 - chunk
+	 - directly as bytes
+	 - by line
+	 */
 
 	// TODO: nice apis
 }

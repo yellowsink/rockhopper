@@ -42,7 +42,7 @@ mixin rhMain!({
 			while (true)
 			{
 				writeln("in sleep loop! fd: ", s);
-				sleep(dur!"msecs"(300));
+				//sleep(dur!"msecs"(300));
 
 				auto res = streamWrite(s, "hi!\n".representation);
 
