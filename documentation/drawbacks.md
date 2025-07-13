@@ -90,3 +90,11 @@ entrypoint({
 	// 4: p goes out of scope and the files and memory are freed
 });
 ```
+
+A more technical note about why this is like this: the D specification guarantees us that in this case `Pipe` will be kept
+alive long enough for us to safely access it (20.19.2), but unfortunately while it's memory still exists, the destructor is
+still called when it goes out of scope.
+
+This leads to contradictory behaviour where the language is supposed to make sure that delegates' referenced variables are
+not deallocated, but forgets to ensure that their lifetime was actually extended.
+A minimum example that shows this behaviour without all the added complexity of fibers and rockhopper: https://godbolt.org/z/3oz5j8cfM
