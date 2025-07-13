@@ -43,11 +43,8 @@ mixin rhMain!({
 			{
 				writeln("in sleep loop! fd: ", s);
 				sleep(dur!"msecs"(300));
-				writeln("sleep returned.");
 
 				auto res = streamWrite(s, "hi!\n".representation);
-				// HELP CODE EXECUTION NEVER GETS TO THIS COMMENT HERE, WHY IS MY REACTOR BROKEN?
-				writeln("write returned");
 
 				if (res.status != IOStatus.ok)
 				{

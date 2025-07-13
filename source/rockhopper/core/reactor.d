@@ -135,15 +135,29 @@ private struct Reactor
 			// otherwise, we .call() on a finished fiber - segfault on dmd and ldc, noop on gdc.
 			if (newFibersAdded) continue;
 
+
+			auto anyFibersToImmediatelyRun = false;
+
 			// step 4: register callbacks on fibers that need it
+			// and also step 5: figure out if we can safely block on the events or not
+			//          (if we mess that up we either lock up when we had fibers ready-to-run, or we loop on 100% cpu!)
 			foreach (f; fibers)
+			{
 				registerCallbackIfNeeded(f);
 
+				// if the fiber is or was waiting, and has just finished waiting, it should be run immediately
+				// else fiber was manually waited with e.g. a yield() loop and should be allowed to be blocked
+				// as it may only be awoken by some other fiber waking up
+				anyFibersToImmediatelyRun |= f.suspendRegistered && !f.suspendResult.isNull;
+			}
+
 			// step 6: run event loop!
-			// when processEvents is called with no params, will wait unless none are queued
-			// instead, we want to just wait indefinitely if there are no queued events, so pass Duration.max
-			// double check that fibers still exist! if all exited, then this would just hang forever.
-			if (fibers.length && ExitReason.exited == eventDriver.core.processEvents(Duration.max)) break;
+			// if we're out of fibers don't bother waiting either (edge case)
+			if (fibers.length && ExitReason.exited == eventDriver.core.processEvents(
+				anyFibersToImmediatelyRun
+					? Duration.zero
+					: Duration.max
+				)) break;
 
 			// ExitReason.exited -> earlyExit()
 			//           .idle -> processed some events
